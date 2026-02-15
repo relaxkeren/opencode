@@ -101,16 +101,66 @@ bun run --cwd packages/desktop tauri build
 To compile a standalone "localcode" executable:
 
 ```bash
-./packages/opencode/script/build.ts --single
+bun run packages/opencode/script/build.ts --single
 ```
 
 The built binary will be at:
 
 ```
-./packages/opencode/dist/opencode-<platform>/bin/opencode
+bun run packages/opencode/dist/opencode-<platform>/bin/opencode
 ```
 
 Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`, `win32-x64`).
+
+---
+
+## Installing the Local Build
+
+After building, you have several options to use the binary system-wide.
+
+### Option 1: Direct execution
+
+Run the binary directly from the dist folder:
+
+```bash
+./packages/opencode/dist/opencode-<platform>/bin/opencode --help
+```
+
+### Option 2: Set OPENCODE_BIN_PATH
+
+Point the npm wrapper to your locally built binary:
+
+```bash
+export OPENCODE_BIN_PATH=$(pwd)/packages/opencode/dist/opencode-<platform>/bin/opencode
+opencode --help
+```
+
+Add this to your shell profile (`.bashrc`, `.zshrc`) for persistence.
+
+### Option 3: Create a symlink
+
+Link the binary into a directory in your PATH:
+
+```bash
+# Create ~/.local/bin if it doesn't exist
+mkdir -p ~/.local/bin
+
+# Create the symlink
+ln -s $(pwd)/packages/opencode/dist/opencode-<platform>/bin/opencode ~/.local/bin/opencode
+
+# Verify
+opencode --version
+```
+
+### Option 4: Copy to PATH
+
+Copy the binary directly to a location in your PATH:
+
+```bash
+cp ./packages/opencode/dist/opencode-<platform>/bin/opencode ~/.local/bin/opencode
+```
+
+> **Note:** On Windows, copy `opencode.exe` to a directory in your PATH or add the dist bin folder to PATH.
 
 ## Testing
 
