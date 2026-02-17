@@ -1,42 +1,74 @@
----
-description: Extract non-obvious learnings from session to AGENTS.md files to build codebase understanding
----
+# /learn - Extract Reusable Patterns
 
-Analyze this session and extract non-obvious learnings to add to AGENTS.md files.
+Analyze the current session and extract any patterns worth saving as skills.
 
-AGENTS.md files can exist at any directory level, not just the project root. When an agent reads a file, any AGENTS.md in parent directories are automatically loaded into the context of the tool read. Place learnings as close to the relevant code as possible:
+## Trigger
 
-- Project-wide learnings → root AGENTS.md
-- Package/module-specific → packages/foo/AGENTS.md
-- Feature-specific → src/auth/AGENTS.md
+Run `/learn` at any point during a session when you've solved a non-trivial problem.
 
-What counts as a learning (non-obvious discoveries only):
+## What to Extract
 
-- Hidden relationships between files or modules
-- Execution paths that differ from how code appears
-- Non-obvious configuration, env vars, or flags
-- Debugging breakthroughs when error messages were misleading
-- API/tool quirks and workarounds
-- Build/test commands not in README
-- Architectural decisions and constraints
-- Files that must change together
+Look for:
 
-What NOT to include:
+1. **Error Resolution Patterns**
+   - What error occurred?
+   - What was the root cause?
+   - What fixed it?
+   - Is this reusable for similar errors?
 
-- Obvious facts from documentation
-- Standard language/framework behavior
-- Things already in an AGENTS.md
-- Verbose explanations
-- Session-specific details
+2. **Debugging Techniques**
+   - Non-obvious debugging steps
+   - Tool combinations that worked
+   - Diagnostic patterns
 
-Process:
+3. **Workarounds**
+   - Library quirks
+   - API limitations
+   - Version-specific fixes
 
-1. Review session for discoveries, errors that took multiple attempts, unexpected connections
-2. Determine scope - what directory does each learning apply to?
-3. Read existing AGENTS.md files at relevant levels
-4. Create or update AGENTS.md at the appropriate level
-5. Keep entries to 1-3 lines per insight
+4. **Project-Specific Patterns**
+   - Codebase conventions discovered
+   - Architecture decisions made
+   - Integration patterns
 
-After updating, summarize which AGENTS.md files were created/updated and how many learnings per file.
+## Output Format
 
-$ARGUMENTS
+Create a skill file at `~/.claude/skills/learned/[pattern-name].md`:
+
+```markdown
+# [Descriptive Pattern Name]
+
+**Extracted:** [Date]
+**Context:** [Brief description of when this applies]
+
+## Problem
+
+[What problem this solves - be specific]
+
+## Solution
+
+[The pattern/technique/workaround]
+
+## Example
+
+[Code example if applicable]
+
+## When to Use
+
+[Trigger conditions - what should activate this skill]
+```
+
+## Process
+
+1. Review the session for extractable patterns
+2. Identify the most valuable/reusable insight
+3. Draft the skill file
+4. Ask user to confirm before saving
+5. Save to `~/.claude/skills/learned/`
+
+## Notes
+
+- Don't extract trivial fixes (typos, simple syntax errors)
+- Don't extract one-time issues (specific API outages, etc.)
+- Focus on patterns that will save time in future sessions
+- Keep skills focused - one pattern per skill
