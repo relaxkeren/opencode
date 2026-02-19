@@ -45,11 +45,9 @@ export async function handleAskCommand(interaction: ChatInputCommandInteraction<
 
     // Send prompt
     const result = await session.client.session.prompt({
-      path: { id: session.sessionId },
-      body: {
-        ...(session.model ? { model: session.model } : {}),
-        parts: [{ type: "text", text: question }],
-      },
+      sessionID: session.sessionId,
+      ...(session.model ? { model: session.model } : {}),
+      parts: [{ type: "text", text: question }],
     })
 
     if (result.error) {

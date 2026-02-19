@@ -90,11 +90,9 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
     console.log("Parts:", JSON.stringify(parts, null, 2))
     console.log("Model:", JSON.stringify(session.model))
     const result = await session.client.session.prompt({
-      path: { id: session.sessionId },
-      body: {
-        ...(session.model ? { model: session.model } : {}),
-        parts,
-      },
+      sessionID: session.sessionId,
+      ...(session.model ? { model: session.model } : {}),
+      parts,
     })
 
     console.log("📤 Full SDK response:", JSON.stringify(result, null, 2))
