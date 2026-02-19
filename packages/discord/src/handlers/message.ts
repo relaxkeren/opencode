@@ -1,8 +1,10 @@
 import { getOrCreateSession, handleMessageWithAttachments } from "../utils/session.js"
 import { sendTyping } from "../utils/discord.js"
 import type { Message, TextChannel, ThreadChannel } from "discord.js"
+import { ConfigManager } from "../config/manager.js"
+import { PairingStore } from "../security/pairing.js"
 
-export async function handleMessage(message: Message) {
+export async function handleMessage(message: Message, _config?: ConfigManager, _pairing?: PairingStore) {
   // Skip bot messages
   if (message.author.bot) return
 
@@ -55,7 +57,7 @@ export async function handleMessage(message: Message) {
     const result = await session.client.session.prompt({
       sessionID: session.sessionId,
       parts,
-    } as any)
+    })
 
     // Remove thinking reaction (skip in DMs)
     if (!isDM) {

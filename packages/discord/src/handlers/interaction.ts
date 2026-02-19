@@ -7,8 +7,14 @@ import { handleMcpCommand } from "../commands/mcp.js"
 import { handleConnectCommand } from "../commands/connect.js"
 import { handleStatusCommand } from "../commands/status.js"
 import { handleHelpCommand } from "../commands/help.js"
+import { ConfigManager } from "../config/manager.js"
+import { PairingStore } from "../security/pairing.js"
 
-export async function handleInteraction(interaction: Interaction<CacheType>) {
+export async function handleInteraction(
+  interaction: Interaction<CacheType>,
+  _config?: ConfigManager,
+  _pairing?: PairingStore,
+) {
   if (!interaction.isChatInputCommand()) return
 
   const { commandName } = interaction
