@@ -45,8 +45,11 @@ export async function handleAskCommand(interaction: ChatInputCommandInteraction<
 
     // Send prompt
     const result = await session.client.session.prompt({
-      sessionID: session.sessionId,
-      parts: [{ type: "text", text: question }],
+      path: { id: session.sessionId },
+      body: {
+        ...(session.model ? { model: session.model } : {}),
+        parts: [{ type: "text", text: question }],
+      },
     })
 
     if (result.error) {
@@ -60,12 +63,15 @@ export async function handleAskCommand(interaction: ChatInputCommandInteraction<
       return
     }
 
-    // Build response text
+    // Build response text - check both info.content and parts (matching Slack integration)
+    const response = result.data
     const responseText =
-      result.data.parts
+      response.info?.content ||
+      response.parts
         ?.filter((p: any) => p.type === "text")
         .map((p: any) => p.text)
-        .join("\n") || "No response received"
+        .join("\n") ||
+      "No response received"
 
     // Truncate if too long for Discord
     if (responseText.length > 1900) {

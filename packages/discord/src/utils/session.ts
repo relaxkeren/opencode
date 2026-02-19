@@ -1,9 +1,92 @@
 import { getSessionKey, getDMSessionKey, downloadAttachment } from "./discord.js"
 import type { SessionData } from "../types/index.js"
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@opencode-ai/sdk"
 import type { TextChannel, ThreadChannel, Message } from "discord.js"
+import { spawn } from "node:child_process"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 
 const sessions = new Map<string, SessionData>()
+
+async function createOpencodeFromSource(options?: { port?: number; timeout?: number }) {
+  const port = options?.port ?? 0
+  const timeout = options?.timeout ?? 5000
+
+  const currentDir = path.dirname(fileURLToPath(import.meta.url))
+  const args = [
+    `run`,
+    `--cwd`,
+    path.resolve(currentDir, "../../../../packages/opencode"),
+    `--conditions=browser`,
+    `src/index.ts`,
+    `serve`,
+    `--hostname=127.0.0.1`,
+    `--port=${port}`,
+  ]
+
+  console.log("🚀 Starting opencode server from source...")
+  console.log("Command: bun", args.join(" "))
+
+  const proc = spawn(`bun`, args, {
+    env: {
+      ...process.env,
+      // Don't override config - let server load user's global config from ~/.config/opencode
+    },
+  })
+
+  const url = await new Promise<string>((resolve, reject) => {
+    const id = setTimeout(() => {
+      reject(new Error(`Timeout waiting for server to start after ${timeout}ms`))
+    }, timeout)
+    let output = ""
+    proc.stdout?.on("data", (chunk) => {
+      const text = chunk.toString()
+      output += text
+      console.log("[server stdout]", text)
+      const lines = output.split("\n")
+      for (const line of lines) {
+        if (line.startsWith("opencode server listening")) {
+          const match = line.match(/on\s+(https?:\/\/[^\s]+)/)
+          if (!match) {
+            throw new Error(`Failed to parse server url from output: ${line}`)
+          }
+          clearTimeout(id)
+          resolve(match[1]!)
+          return
+        }
+      }
+    })
+    proc.stderr?.on("data", (chunk) => {
+      const text = chunk.toString()
+      output += text
+      console.log("[server stderr]", text)
+    })
+    proc.on("exit", (code) => {
+      clearTimeout(id)
+      let msg = `Server exited with code ${code}`
+      if (output.trim()) {
+        msg += `\nServer output: ${output}`
+      }
+      reject(new Error(msg))
+    })
+    proc.on("error", (error) => {
+      clearTimeout(id)
+      reject(error)
+    })
+  })
+
+  const client = createOpencodeClient({ baseUrl: url })
+
+  return {
+    client,
+    server: {
+      url,
+      close() {
+        proc.kill()
+      },
+    },
+  }
+}
 
 export async function getOrCreateSession(message: Message, existingSessionId?: string): Promise<SessionData | null> {
   const userId = message.author.id
@@ -22,9 +105,9 @@ export async function getOrCreateSession(message: Message, existingSessionId?: s
     return existing
   }
 
-  // Create new opencode instance
+  // Create new opencode instance from source
   console.log("🚀 Starting opencode server...")
-  const opencode = await createOpencode({ port: 0 })
+  const opencode = await createOpencodeFromSource({ port: 0 })
   console.log("✅ Opencode server ready")
 
   const { client, server } = opencode

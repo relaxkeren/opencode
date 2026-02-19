@@ -54,10 +54,16 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
     // Send prompt
     console.log("Sending prompt with sessionID:", session.sessionId)
     console.log("Parts:", JSON.stringify(parts, null, 2))
+    console.log("Model:", JSON.stringify(session.model))
     const result = await session.client.session.prompt({
-      sessionID: session.sessionId,
-      parts,
+      path: { id: session.sessionId },
+      body: {
+        ...(session.model ? { model: session.model } : {}),
+        parts,
+      },
     })
+
+    console.log("📤 Full SDK response:", JSON.stringify(result, null, 2))
 
     // Remove thinking reaction (skip in DMs)
     if (!isDM) {
@@ -70,12 +76,18 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
       return
     }
 
-    // Build response text
+    // Build response text - check both info.content and parts (matching Slack integration)
+    console.log("📊 result.data:", JSON.stringify(result.data, null, 2))
+    console.log("📊 result.data.parts:", JSON.stringify(result.data?.parts, null, 2))
+    console.log("📊 result.data.info:", JSON.stringify(result.data?.info, null, 2))
+    const response = result.data
     const responseText =
-      result.data.parts
+      response.info?.content ||
+      response.parts
         ?.filter((p: any) => p.type === "text")
         .map((p: any) => p.text)
-        .join("\n") || "I received your message but didn't have a response."
+        .join("\n") ||
+      "I received your message but didn't have a response."
 
     // Send response (tool updates will come via live events)
     if (responseText.length > 1900) {
