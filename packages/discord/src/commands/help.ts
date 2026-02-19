@@ -32,7 +32,8 @@ export async function handleHelpCommand(interaction: ChatInputCommandInteraction
 **Agent & Model:**
 • "/agent list" - List available agents
 • "/agent switch <name>" - Switch active agent
-• "/model list" - List available models
+• "/model list" - List connected provider models
+• "/model list --all" - List all available models
 • "/model switch <provider> <model>" - Switch model
 
 **MCP Tools:**
