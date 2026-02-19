@@ -17,6 +17,7 @@ export async function handleInteraction(
 ) {
   if (!interaction.isChatInputCommand()) return
 
+  console.log(`[interaction] Received command: ${interaction.commandName}`)
   const { commandName } = interaction
 
   try {
