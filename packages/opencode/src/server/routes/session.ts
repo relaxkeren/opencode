@@ -16,6 +16,7 @@ import { Log } from "../../util/log"
 import { PermissionNext } from "@/permission/next"
 import { errors } from "../error"
 import { lazy } from "../../util/lazy"
+import { Config } from "../../config/config"
 
 const log = Log.create({ service: "server" })
 
@@ -723,7 +724,18 @@ export const SessionRoutes = lazy(() =>
       validator("json", SessionPrompt.PromptInput.omit({ sessionID: true })),
       async (c) => {
         const sessionID = c.req.valid("param").sessionID
-        const body = c.req.valid("json")
+        let body = c.req.valid("json")
+
+        // If no model specified, use default from config
+        if (!body.model) {
+          const cfg = await Config.get()
+          if (cfg.model) {
+            const [providerID, modelID] = cfg.model.split("/")
+            body = { ...body, model: { providerID, modelID } }
+            console.log("[session.prompt] Using default model:", cfg.model)
+          }
+        }
+
         console.log("[session.prompt] Received request for session:", sessionID)
         console.log("[session.prompt] Request body:", JSON.stringify(body))
         const msg = await SessionPrompt.prompt({ ...body, sessionID })

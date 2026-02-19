@@ -63,15 +63,18 @@ export async function handleAskCommand(interaction: ChatInputCommandInteraction<
       return
     }
 
-    // Build response text - check both info.content and parts (matching Slack integration)
+    // Build response text - extract from parts array
     const response = result.data
-    const responseText =
-      response.info?.content ||
-      response.parts
-        ?.filter((p: any) => p.type === "text")
-        .map((p: any) => p.text)
-        .join("\n") ||
-      "No response received"
+    if (!response) {
+      await interaction.editReply({
+        embeds: [createErrorEmbed("No response received")],
+      })
+      return
+    }
+
+    // Extract text from parts
+    const textParts = response.parts?.filter((p: any) => p.type === "text") || []
+    const responseText = textParts.length > 0 ? textParts.map((p: any) => p.text).join("\n") : "No response received"
 
     // Truncate if too long for Discord
     if (responseText.length > 1900) {
