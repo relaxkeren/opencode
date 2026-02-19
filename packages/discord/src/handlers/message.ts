@@ -1,10 +1,14 @@
 import { getOrCreateSession, handleMessageWithAttachments } from "../utils/session.js"
 import { sendTyping } from "../utils/discord.js"
+import { handleTextCommand } from "../utils/text-command.js"
 import type { Message, TextChannel, ThreadChannel } from "discord.js"
 import { ConfigManager } from "../config/manager.js"
 import { PairingStore } from "../security/pairing.js"
 
 export async function handleMessage(message: Message, _config?: ConfigManager, _pairing?: PairingStore) {
+  const msgId = Math.random().toString(36).slice(2, 8)
+  console.log(`[message:${msgId}] ==== NEW MESSAGE ====`)
+
   // Skip bot messages
   if (message.author.bot) return
 
@@ -26,6 +30,16 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
   // Skip if no content and no attachments
   if (!content && message.attachments.size === 0) return
 
+  // Check for text command first (e.g., /session list)
+  console.log(`[message:${msgId}] Raw content:`, message.content)
+  const commandHandled = await handleTextCommand(message, content)
+  console.log(`[message:${msgId}] commandHandled:`, commandHandled)
+  if (commandHandled === true) {
+    console.log(`[message:${msgId}] Returning early - command handled`)
+    return
+  }
+
+  console.log(`[message:${msgId}] Proceeding to LLM path (no command matched)`)
   try {
     // Show typing indicator
     await sendTyping(channel as TextChannel | ThreadChannel)
@@ -33,6 +47,7 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
     // Get or create session
     const session = await getOrCreateSession(message)
     if (!session) {
+      console.error(`[message:${msgId}] ❌ Failed to create session.`)
       await message.reply("❌ Failed to create session. Please try again.")
       return
     }
@@ -71,7 +86,7 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
     }
 
     if (result.error) {
-      console.error("Prompt error:", result.error)
+      console.error(`[message:${msgId}] ❌ Prompt error:`, result.error)
       await message.reply("❌ Sorry, I had trouble processing your message. Please try again.")
       return
     }
@@ -80,6 +95,7 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
     console.log("📊 Full response:", JSON.stringify(result, null, 2))
     const response = result.data
     if (!response) {
+      console.error(`[message:${msgId}] ❌ No response received.`)
       await message.reply("❌ No response received.")
       return
     }
@@ -94,6 +110,7 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
     // Send response (tool updates will come via live events)
     if (responseText.length > 1900) {
       const buffer = Buffer.from(responseText, "utf-8")
+      console.log(`[message:${msgId}] Sending response with attachments`)
       await message.reply({
         content: "📄 Response:",
         files: [
@@ -104,10 +121,11 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
         ],
       })
     } else {
+      console.log(`[message:${msgId}] Sending response:`, responseText)
       await message.reply(responseText)
     }
   } catch (error) {
-    console.error("Message handling error:", error)
+    console.error(`[message:${msgId}] ❌ Message handling error:`, error)
     await message.reply("❌ An error occurred while processing your message.")
   }
 }
