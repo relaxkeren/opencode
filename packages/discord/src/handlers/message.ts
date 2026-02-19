@@ -8,18 +8,28 @@ import { PairingStore } from "../security/pairing.js"
 export async function handleMessage(message: Message, _config?: ConfigManager, _pairing?: PairingStore) {
   const msgId = Math.random().toString(36).slice(2, 8)
   console.log(`[message:${msgId}] ==== NEW MESSAGE ====`)
+  console.log(`[message:${msgId}] Raw content:`, message.content)
 
   // Skip bot messages
-  if (message.author.bot) return
+  if (message.author.bot) {
+    console.log(`[message:${msgId}] RETURN: bot message`)
+    return
+  }
 
   const channel = message.channel
-  if (!channel.isTextBased() || channel.isVoiceBased()) return
+  if (!channel.isTextBased() || channel.isVoiceBased()) {
+    console.log(`[message:${msgId}] RETURN: not text based`)
+    return
+  }
 
   // Check if bot is mentioned or message is in a DM
   const isMentioned = message.mentions.users.has(message.client.user?.id || "")
   const isDM = channel.isDMBased()
 
-  if (!isMentioned && !isDM) return
+  if (!isMentioned && !isDM) {
+    console.log(`[message:${msgId}] RETURN: not mentioned and not DM`)
+    return
+  }
 
   // Remove bot mention from message content
   let content = message.content
@@ -27,15 +37,24 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
     content = content.replace(new RegExp(`<@!?${message.client.user?.id}>`, "g"), "").trim()
   }
 
+  console.log(`[message:${msgId}] Cleaned content:`, content)
+
   // Skip if no content and no attachments
-  if (!content && message.attachments.size === 0) return
+  if (!content && message.attachments.size === 0) {
+    console.log(`[message:${msgId}] RETURN: no content and no attachments`)
+    return
+  }
 
   // Check for text command first (e.g., /session list)
-  console.log(`[message:${msgId}] Raw content:`, message.content)
-  const commandHandled = await handleTextCommand(message, content)
+  let commandHandled = false
+  try {
+    commandHandled = await handleTextCommand(message, content)
+  } catch (err) {
+    console.error(`[message:${msgId}] ❌ Error in handleTextCommand:`, err)
+  }
   console.log(`[message:${msgId}] commandHandled:`, commandHandled)
   if (commandHandled === true) {
-    console.log(`[message:${msgId}] Returning early - command handled`)
+    console.log(`[message:${msgId}] RETURN: command handled - exiting early`)
     return
   }
 
