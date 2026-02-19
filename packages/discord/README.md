@@ -2,14 +2,7 @@
 
 Official Discord bot for [opencode](https://github.com/opencode-ai/opencode) - interact with AI agents directly in Discord.
 
-## Features
-
-- **Direct Messages**: Private 1-on-1 conversations with opencode
-- **Channel Support**: Team collaboration in Discord channels
-- **Slash Commands**: Quick access to all opencode features
-- **Thread-Based Sessions**: Each conversation has its own context
-- **File Attachments**: Share code files and documents for analysis
-- **Rich Formatting**: Code blocks, embeds, and interactive buttons
+---
 
 ## Quick Start
 
@@ -54,6 +47,8 @@ cp .env.example .env
 bun run dev
 ```
 
+---
+
 ## Commands
 
 ### General
@@ -93,14 +88,91 @@ bun run dev
 
 - `/connect` - Connect AI provider (OAuth or instructions)
 
+---
+
 ## Architecture
 
-The bot uses:
+The bot embeds an OpenCode server and uses the SDK to communicate with AI providers.
 
-- **discord.js** for Discord API integration
-- **@opencode-ai/sdk** to communicate with opencode
-- Auto-started opencode server for each bot instance
-- SQLite for persistent session storage
+```
+Discord User
+    ↓ (message)
+Discord Bot (discord.js)
+    ↓ (handleMessage)
+OpenCode SDK Client
+    ↓ (session.prompt)
+OpenCode Server (localhost)
+    ↓ (process)
+AI Provider (moonshotai, google, etc.)
+```
+
+### Session Management
+
+Each user/channel combination gets its own session:
+
+- **Session ID** - Unique identifier for the conversation
+- **SDK Client** - OpenCode SDK instance
+- **Server Handle** - Local OpenCode server process
+- **Model Config** - Selected provider and model
+
+Sessions are stored in memory and persist for the bot's lifetime.
+
+### Message Flow
+
+1. User sends message (mention bot or DM)
+2. Bot extracts text and attachments
+3. Get or create session for user/channel
+4. Send prompt to OpenCode via SDK
+5. Extract response from parts array
+6. Reply to Discord
+
+### Model Selection Priority
+
+1. **Discord command** (`/model switch`) - highest priority
+2. **Project config** (`.opencode/opencode.jsonc`)
+3. **Global config** (`~/.config/opencode/opencode.json`)
+4. **Server default** - first available provider
+
+---
+
+## Configuration
+
+### Global Config
+
+Location: `~/.config/opencode/opencode.json`
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "moonshotai/kimi-k2.5"
+}
+```
+
+### Auth Keys
+
+Location: `~/.local/share/opencode/auth.json`
+
+```json
+{
+  "moonshotai": {
+    "type": "api",
+    "key": "sk-..."
+  }
+}
+```
+
+### Project Config
+
+Location: `.opencode/opencode.jsonc` (in project root)
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "moonshotai/kimi-k2.5"
+}
+```
+
+---
 
 ## Development
 
@@ -110,7 +182,65 @@ bun run dev
 
 # Type check
 bun run typecheck
+
+# Run tests
+bun test
 ```
+
+### Testing Manually
+
+```bash
+# Start server manually
+cd packages/opencode
+bun run --conditions=browser src/index.ts serve --port 4096
+
+# Test API
+curl -X POST http://localhost:4096/session \
+  -H "Content-Type: application/json" \
+  -d '{"title": "test"}'
+```
+
+---
+
+## Troubleshooting
+
+### "ProviderModelNotFoundError" for anthropic/claude
+
+**Cause:** No model configured and no default set.
+
+**Fix:** Set default model in `.opencode/opencode.jsonc`:
+
+```json
+{ "model": "moonshotai/kimi-k2.5" }
+```
+
+### No response received
+
+**Cause:** Response format changed.
+
+**Check:** The bot extracts text from `parts` array. Verify the provider returns text parts.
+
+---
+
+## File Structure
+
+```
+src/
+├── handlers/
+│   ├── message.ts      # Message handling with model passthrough
+│   └── interaction.ts  # Slash commands
+├── commands/
+│   ├── ask.ts          # /ask command
+│   ├── model.ts        # /model switch command
+│   └── ...
+├── utils/
+│   └── session.ts      # Session management, server spawning
+├── types/
+│   └── index.ts        # Type definitions
+└── index.ts            # Entry point
+```
+
+---
 
 ## License
 
