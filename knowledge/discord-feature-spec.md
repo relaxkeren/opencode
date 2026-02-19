@@ -22,16 +22,27 @@ packages/
     src/
       index.ts          # Main bot entry point
       commands/         # Discord slash commands
+        index.ts        # Command registration
+        ask.ts          # /ask command
         session.ts      # /session commands
         agent.ts        # /agent commands
+        model.ts        # /model commands
+        mcp.ts          # /mcp commands
+        connect.ts      # /connect command
+        status.ts       # /status command
         help.ts         # /help command
       handlers/         # Event handlers
         message.ts      # Message event handling
         interaction.ts  # Slash command interactions
+        ready.ts        # Bot ready event
       utils/            # Utilities
         format.ts       # Discord message formatting
         session.ts      # Session management helpers
+        discord.ts      # Discord helpers
+      types/            # TypeScript types
+        index.ts
     package.json
+    tsconfig.json
     .env.example
     README.md
 ```
@@ -40,15 +51,50 @@ packages/
 
 ```
 Discord Client (discord.js)
-    ↓
-Discord Gateway (WebSocket)
-    ↓
+    |
+    | WebSocket (Gateway)
+    v
 Discord Bot (packages/discord)
-    ↓
+    |
+    | HTTP / WebSocket
+    v
 OpenCode SDK (@opencode-ai/sdk)
-    ↓
-OpenCode Server (local/remote)
+    |
+    v
+OpenCode Server (auto-started, local)
+    |
+    v
+SQLite Database (sessions, messages, parts)
 ```
+
+### Session Mapping
+
+Discord threads/channels map to OpenCode sessions:
+
+```typescript
+// Session key format: `discord:${guildId}:${channelId}:${threadId}`
+// Or for DMs: `discord:dm:${userId}`
+
+const sessions = new Map<
+  string,
+  {
+    sessionId: string // OpenCode session ID
+    client: OpencodeClient
+    server: OpencodeServer
+    channelId: string // Discord channel/thread ID
+    userId: string // Discord user ID
+    agent?: string // Selected agent name (local state)
+    model?: {
+      // Selected model (local state)
+      providerID: string
+      modelID: string
+    }
+    lastActivity: Date
+  }
+>()
+```
+
+**Note on persistence**: Sessions are stored in-memory (Map). Server-side sessions persist in SQLite. Users can reconnect to existing sessions via `/session attach <id>`.
 
 ## Features
 
@@ -61,7 +107,7 @@ Users can DM the bot for private, 1-on-1 interactions with opencode.
 - User sends DM to bot
 - Bot creates/uses existing session tied to user's Discord ID
 - Maintains persistent conversation history
-- Supports all opencode features (tools, agents, etc.)
+- Supports all opencode features (tools, agents, file attachments)
 
 ### 2. Channel Support
 
@@ -78,37 +124,37 @@ Bot can be invited to Discord channels for team collaboration.
 
 Native Discord slash commands for quick actions:
 
-| Command                     | Description                                                                 |
-| --------------------------- | --------------------------------------------------------------------------- |
-| `/ask <question>`           | Quick question without thread                                              |
-| `/session create`           | Create new opencode session (parity with TUI `/new`)                       |
-| `/session list`             | List your active sessions (parity with TUI `/sessions`)                    |
-| `/session attach <id>`      | Attach current channel/thread to existing session                          |
-| `/session share`            | Get shareable link to current session                                      |
-| `/session unshare`          | Revoke share link for current session (parity with TUI `/unshare`)         |
-| `/session rename <name>`    | Rename current session (parity with TUI `/rename`)                         |
-| `/session compact`          | Summarize/compact current session (parity with TUI `/compact`/`/summarize`) |
-| `/session undo`             | Undo last user message and revert related file changes                     |
-| `/session redo`             | Redo most recently undone message                                          |
-| `/session export`           | Export current session as Markdown and upload as a file                    |
-| `/session copy`             | Return full session transcript as text (e.g. DM or file attachment)       |
-| `/session fork <message>`   | Start a new session from a specific message (e.g. via Discord message link) |
-| `/agent list`               | List available agents                                                      |
-| `/agent switch <name>`      | Switch active agent                                                        |
-| `/model list`               | List available models (parity with TUI `/models`)                          |
-| `/model switch <name>`      | Switch active model for the current session                                |
-| `/mcp list`                 | List available MCP tools/integrations (parity with TUI `/mcps`)           |
-| `/mcp toggle <name>`        | Enable or disable an MCP integration for the current session              |
-| `/connect`                  | Start provider connect flow (link/instructions to add provider API keys)  |
-| `/status`                   | Show opencode server and session status                                   |
-| `/help`                     | Show available commands and usage help                                    |
+| Command                            | Options                                   | Description                                             |
+| ---------------------------------- | ----------------------------------------- | ------------------------------------------------------- |
+| `/ask <question>`                  | `question` (required string)              | Quick question without thread                           |
+| `/session create`                  | `title` (optional string)                 | Create new opencode session                             |
+| `/session list`                    | -                                         | List your active sessions                               |
+| `/session attach <id>`             | `id` (required string)                    | Attach current channel/thread to existing session       |
+| `/session share`                   | -                                         | Get shareable link to current session                   |
+| `/session unshare`                 | -                                         | Revoke share link for current session                   |
+| `/session rename <name>`           | `name` (required string)                  | Rename current session                                  |
+| `/session compact`                 | -                                         | Summarize/compact current session                       |
+| `/session undo`                    | -                                         | Undo last user message and revert file changes          |
+| `/session redo`                    | -                                         | Redo most recently undone message                       |
+| `/session export`                  | -                                         | Export current session as Markdown file attachment      |
+| `/session copy`                    | -                                         | Return full session transcript (as file if >2000 chars) |
+| `/session fork <message>`          | `message_id` (required string)            | Start new session from a message                        |
+| `/agent list`                      | -                                         | List available agents                                   |
+| `/agent switch <name>`             | `name` (required string)                  | Switch active agent (local state)                       |
+| `/model list`                      | -                                         | List available models                                   |
+| `/model switch <provider> <model>` | `provider` (required), `model` (required) | Switch model for current session                        |
+| `/mcp list`                        | -                                         | List available MCP tools/integrations                   |
+| `/mcp toggle <name>`               | `name` (required string)                  | Enable/disable MCP integration                          |
+| `/connect`                         | -                                         | Start provider connect flow (OAuth or instructions)     |
+| `/status`                          | -                                         | Show opencode server and session status                 |
+| `/help`                            | -                                         | Show available commands and usage help                  |
 
 ### 4. Thread-Based Sessions
 
 Discord threads map to OpenCode sessions:
 
-- **Auto-threading**: Bot can create threads for complex queries
-- **Session persistence**: Thread ID maps to OpenCode session ID
+- **Auto-threading**: Bot creates threads for complex queries (optional)
+- **Session persistence**: Thread ID maps to OpenCode session ID (in-memory)
 - **Shared context**: Thread participants share session context
 - **Resume**: Can resume sessions via thread or `/session attach`
 
@@ -118,9 +164,9 @@ Leverage Discord's rich formatting:
 
 - **Code blocks**: Syntax-highlighted code responses
 - **Embeds**: Rich formatting for tool results, errors
-- **Attachments**: File uploads/downloads
-- **Buttons**: Quick action buttons (approve/reject, etc.)
-- **Reactions**: Status indicators (thinking, done, error)
+- **Attachments**: File uploads/downloads (including user file uploads)
+- **Buttons**: Quick action buttons (approve/reject for permissions)
+- **Reactions**: Status indicators (thinking ⏳, done ✅, error ❌)
 
 ### 6. Tool Integration Display
 
@@ -130,6 +176,14 @@ Display opencode tool usage in Discord:
 - Progress indicators for long-running tools
 - Collapsible results
 - Link to open in web UI for detailed view
+
+### 7. File Attachments
+
+Users can upload files to Discord for analysis:
+
+- Bot downloads attachment and includes in prompt as `FilePartInput`
+- Supports code files, images (for vision models), documents
+- Files are sent as parts in `session.prompt()` calls
 
 ## Technical Implementation
 
@@ -156,28 +210,7 @@ DISCORD_CLIENT_ID=your_client_id_here
 
 # Optional
 DISCORD_GUILD_ID=optional_guild_for_dev  # For dev command registration
-OPENCODE_SERVER_URL=auto  # Auto-start or specify URL
 OPENCODE_CONFIG_PATH=~/.config/opencode/discord.json
-```
-
-### Session Management
-
-```typescript
-// Session key format: `discord:${guildId}:${channelId}:${threadId}`
-// Or for DMs: `discord:dm:${userId}`
-
-const sessions = new Map<
-  string,
-  {
-    sessionId: string
-    client: OpencodeClient
-    server: OpencodeServer
-    channelId: string
-    threadId?: string
-    userId: string
-    lastActivity: Date
-  }
->()
 ```
 
 ### Message Handling
@@ -194,10 +227,28 @@ async function handleMessage(message: Message) {
   // Show "typing" indicator
   await message.channel.sendTyping()
 
+  // Handle file attachments
+  const parts: Array<TextPartInput | FilePartInput> = []
+
+  if (message.content) {
+    parts.push({ type: "text", text: message.content })
+  }
+
+  for (const attachment of message.attachments.values()) {
+    const fileContent = await downloadAttachment(attachment)
+    parts.push({
+      type: "file",
+      source: {
+        type: "text",
+        text: { content: fileContent },
+      },
+    })
+  }
+
   // Send to opencode
   const result = await session.client.session.prompt({
     path: { id: session.sessionId },
-    body: { parts: [{ type: "text", text: message.content }] },
+    body: { parts },
   })
 
   // Format and send response
@@ -221,6 +272,26 @@ const commands = [
       },
     ],
   },
+  {
+    name: "session",
+    description: "Session management",
+    options: [
+      {
+        name: "create",
+        type: ApplicationCommandOptionType.Subcommand,
+        description: "Create a new session",
+        options: [
+          {
+            name: "title",
+            type: ApplicationCommandOptionType.String,
+            description: "Session title",
+            required: false,
+          },
+        ],
+      },
+      // ... more subcommands
+    ],
+  },
   // ... more commands
 ]
 
@@ -229,12 +300,106 @@ const rest = new REST({ version: "10" }).setToken(token)
 await rest.put(Routes.applicationCommands(clientId), { body: commands })
 ```
 
+### Agent Management
+
+Agent listing uses `client.app.agents()`:
+
+```typescript
+const agents = await client.app.agents()
+// Returns: [{ name: "build", mode: "primary", ... }, ...]
+```
+
+Agent switching is **local state** (like TUI's `local.agent`):
+
+```typescript
+// Store in session data
+session.agent = selectedAgentName
+
+// Apply when sending prompts (server resolves agent per-message based on session history)
+```
+
+### Model Management
+
+Model listing uses `client.provider.list()`:
+
+```typescript
+const providers = await client.provider.list()
+// Returns providers with available models
+```
+
+Model switching is **local state per session**:
+
+```typescript
+session.model = { providerID, modelID }
+```
+
+### Session Operations
+
+| Operation       | SDK Method                                                             |
+| --------------- | ---------------------------------------------------------------------- |
+| Create          | `client.session.create({ body: { title } })`                           |
+| List            | `client.session.list()`                                                |
+| Get             | `client.session.get({ path: { sessionID } })`                          |
+| Prompt          | `client.session.prompt({ path: { sessionID }, body: { parts } })`      |
+| Share           | `client.session.share({ path: { sessionID } })`                        |
+| Unshare         | `client.session.unshare({ path: { sessionID } })`                      |
+| Fork            | `client.session.fork({ path: { sessionID }, body: { messageID } })`    |
+| Summarize       | `client.session.summarize({ path: { sessionID } })`                    |
+| Revert (Undo)   | `client.session.revert({ path: { sessionID } })`                       |
+| Unrevert (Redo) | `client.session.unrevert({ path: { sessionID } })`                     |
+| Export          | Build transcript from `client.session.messages()` + format as Markdown |
+
+### MCP Operations
+
+| Operation | SDK Method                                                                             |
+| --------- | -------------------------------------------------------------------------------------- |
+| List      | `client.mcp.status()`                                                                  |
+| Toggle    | `client.mcp.connect({ body: { name } })` / `client.mcp.disconnect({ body: { name } })` |
+
+### Provider Connect Flow
+
+```typescript
+// Get available auth methods
+const auth = await client.provider.auth()
+// Returns: { providerID: [{ type: "oauth" | "api", label }, ...] }
+
+// For OAuth:
+const authUrl = await client.provider.oauth.authorize({
+  path: { providerID },
+  body: { method: index },
+})
+// Send URL to user: "Click here to authorize: <url>"
+
+// For API keys (local setup only):
+// "Please set YOUR_PROVIDER_API_KEY in your environment and restart the bot"
+```
+
+### Event Subscriptions
+
+Listen to real-time updates:
+
+```typescript
+const events = await client.event.subscribe()
+for await (const event of events.stream) {
+  if (event.type === "message.part.updated") {
+    // Handle streaming response updates
+    const part = event.properties.part
+    if (part.type === "tool") {
+      // Show tool execution in Discord
+    }
+  }
+  if (event.type === "permission.asked") {
+    // Show permission request with approve/reject buttons
+  }
+}
+```
+
 ## User Experience
 
 ### Getting Started
 
 1. **Invite Bot**: Admin invites bot to Discord server
-2. **Grant Permissions**: Bot needs message read/send, thread manage, embed links
+2. **Grant Permissions**: Bot needs message read/send, thread manage, embed links, attach files
 3. **Start Chatting**: Users can immediately DM bot or mention in channels
 
 ### Example Interactions
@@ -244,7 +409,7 @@ await rest.put(Routes.applicationCommands(clientId), { body: commands })
 ```
 User: Can you help me refactor this React component?
 [Bot creates session, responds with questions]
-User: [shares code]
+User: [shares code file]
 Bot: [provides refactored code with explanations]
 ```
 
@@ -259,20 +424,29 @@ User: @opencode help me debug this error
 **Slash Command:**
 
 ```
-/session create
+/session create title:"New Feature"
 [Bot creates new session, shares link]
 
 /ask "Explain React hooks"
 [Bot provides explanation in channel]
 ```
 
+**File Upload:**
+
+```
+User: [uploads main.ts]
+User: Can you review this code?
+Bot: [analyzes file and provides feedback]
+```
+
 ## Security Considerations
 
 1. **Token Storage**: Bot token in environment variables only
 2. **User Isolation**: Each user's sessions isolated by Discord user ID
-3. **Rate Limiting**: Respect Discord API rate limits
+3. **Rate Limiting**: Respect Discord API rate limits (50 req/s global)
 4. **Permission Checks**: Verify user permissions before sensitive operations
 5. **Content Filtering**: Optional content moderation for public servers
+6. **API Keys**: Never ask for API keys in Discord (use OAuth or local config)
 
 ## Deployment Options
 
@@ -344,7 +518,7 @@ Managed bot service for teams (enterprise feature).
 - [ ] Basic DM support
 - [ ] Channel mention support
 - [ ] Simple text responses
-- [ ] Session persistence
+- [ ] Session persistence (in-memory)
 
 ### Phase 2: Core Features (Weeks 3-4)
 
@@ -367,37 +541,10 @@ Managed bot service for teams (enterprise feature).
 - [ ] Role permissions
 - [ ] Analytics
 
-## Files to Create
-
-```
-packages/discord/
-├── src/
-│   ├── index.ts              # Main bot entry
-│   ├── commands/
-│   │   ├── index.ts          # Command registration
-│   │   ├── ask.ts            # /ask command
-│   │   ├── session.ts        # /session commands
-│   │   ├── agent.ts          # /agent commands
-│   │   └── help.ts           # /help command
-│   ├── handlers/
-│   │   ├── message.ts        # Message event handler
-│   │   ├── interaction.ts    # Slash command handler
-│   │   └── ready.ts          # Bot ready event
-│   ├── utils/
-│   │   ├── format.ts         # Message formatting
-│   │   ├── session.ts        # Session management
-│   │   └── discord.ts        # Discord helpers
-│   └── types/
-│       └── index.ts          # TypeScript types
-├── package.json
-├── tsconfig.json
-├── .env.example
-└── README.md
-```
-
 ## References
 
 - **Slack Integration**: `packages/slack/src/index.ts` - Reference implementation
 - **SDK Usage**: `@opencode-ai/sdk` - Client/server creation
+- **Architecture**: `knowledge/ui-architecture.md` - System overview
 - **Discord.js Docs**: https://discord.js.org/
 - **Discord API**: https://discord.com/developers/docs
