@@ -42,20 +42,28 @@ export async function handleMessage(message: Message) {
     const parts = await handleMessageWithAttachments(message, session)
 
     if (parts.length === 0) {
-      await message.reactions.removeAll()
+      // Remove thinking reaction (skip in DMs)
+      if (!isDM) {
+        await message.reactions.removeAll().catch(() => {})
+      }
       return
     }
 
     // Send prompt
+    console.log("Sending prompt with sessionID:", session.sessionId)
+    console.log("Parts:", JSON.stringify(parts, null, 2))
     const result = await session.client.session.prompt({
       sessionID: session.sessionId,
       parts,
-    })
+    } as any)
 
-    // Remove thinking reaction
-    await message.reactions.removeAll()
+    // Remove thinking reaction (skip in DMs)
+    if (!isDM) {
+      await message.reactions.removeAll().catch(() => {})
+    }
 
     if (result.error) {
+      console.error("Prompt error:", result.error)
       await message.reply("❌ Sorry, I had trouble processing your message. Please try again.")
       return
     }
