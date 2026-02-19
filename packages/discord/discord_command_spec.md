@@ -121,7 +121,8 @@ The following are true Discord slash commands that execute directly:
 
 ### Model
 
-- `/model list` - List models
+- `/model list` - List connected provider models
+- `/model list --all` - List all available models
 - `/model switch <provider> <model>` - Switch model
 
 ### MCP

@@ -609,6 +609,7 @@ async function handleModelTextCommand(
 
   switch (subcommand) {
     case "list": {
+      const showAll = args.includes("--all")
       const result = await session.client.provider.list()
       if (result.error || !result.data) {
         console.error("[text-command] ❌ Failed to list models.")
@@ -618,8 +619,20 @@ async function handleModelTextCommand(
         return true
       }
 
+      const providers = showAll ? result.data.all : result.data.all.filter((p) => result.data.connected.includes(p.id))
+
+      if (providers.length === 0) {
+        const msg = showAll
+          ? "No providers available"
+          : "No connected providers. Use `/connect` to connect a provider, or `/model list --all` to see all available models."
+        await message.reply({
+          embeds: [createInfoEmbed("Available Models", msg)],
+        })
+        return true
+      }
+
       let modelList = ""
-      for (const provider of result.data.all) {
+      for (const provider of providers) {
         const models = Object.entries(provider.models)
           .map(([id, info]: [string, any]) => `  • ${id} - ${info.name || id}`)
           .join("\n")
@@ -638,8 +651,9 @@ async function handleModelTextCommand(
           ],
         })
       } else {
+        const title = showAll ? "All Available Models" : "Connected Provider Models"
         await message.reply({
-          embeds: [createInfoEmbed("Available Models", modelList || "No models found")],
+          embeds: [createInfoEmbed(title, modelList || "No models found")],
         })
       }
       return true
@@ -852,7 +866,8 @@ async function handleHelpTextCommand(message: Message): Promise<boolean> {
 **Agent & Model:**
 • "/agent list" - List available agents
 • "/agent switch <name>" - Switch active agent
-• "/model list" - List available models
+• "/model list" - List connected provider models
+• "/model list --all" - List all available models
 • "/model switch <provider> <model>" - Switch model
 
 **MCP Tools:**
