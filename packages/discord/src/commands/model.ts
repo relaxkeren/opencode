@@ -7,7 +7,14 @@ import type { TextChannel, ThreadChannel } from "discord.js"
 export const modelCommand = new SlashCommandBuilder()
   .setName("model")
   .setDescription("Model management commands")
-  .addSubcommand((subcommand) => subcommand.setName("list").setDescription("List available models"))
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("list")
+      .setDescription("List available models")
+      .addBooleanOption((option) =>
+        option.setName("all").setDescription("Show all models (not just connected)").setRequired(false),
+      ),
+  )
   .addSubcommand((subcommand) =>
     subcommand
       .setName("switch")
@@ -51,6 +58,8 @@ export async function handleModelCommand(interaction: ChatInputCommandInteractio
 
     switch (subcommand) {
       case "list": {
+        const allOption = interaction.options.get("all")
+        const showAll = allOption ? allOption.value === true : false
         const result = await session.client.provider.list()
 
         if (result.error || !result.data) {
@@ -60,19 +69,35 @@ export async function handleModelCommand(interaction: ChatInputCommandInteractio
           return
         }
 
+        const providers = showAll
+          ? result.data.all
+          : result.data.all.filter((p) => result.data.connected.includes(p.id))
+
+        if (providers.length === 0) {
+          const message = showAll
+            ? "No providers available"
+            : "No connected providers. Use `/connect` to connect a provider, or `/model list --all` to see all available models."
+          await interaction.editReply({
+            embeds: [createInfoEmbed("Available Models", message)],
+          })
+          return
+        }
+
         let modelList = ""
-        for (const provider of result.data.all) {
+        for (const provider of providers) {
           const models = Object.entries(provider.models)
             .map(([id, info]: [string, any]) => `  • ${id} - ${info.name || id}`)
             .join("\n")
           modelList += `**${provider.name}**\n${models}\n\n`
         }
 
+        const title = showAll ? "All Available Models" : "Connected Models"
+
         // If too long, send as file
         if (modelList.length > 1900) {
           const buffer = Buffer.from(modelList, "utf-8")
           await interaction.editReply({
-            content: "📄 Available models:",
+            content: `📄 ${title}:`,
             files: [
               {
                 attachment: buffer,
@@ -82,7 +107,7 @@ export async function handleModelCommand(interaction: ChatInputCommandInteractio
           })
         } else {
           await interaction.editReply({
-            embeds: [createInfoEmbed("Available Models", modelList || "No models found")],
+            embeds: [createInfoEmbed(title, modelList || "No models found")],
           })
         }
         break

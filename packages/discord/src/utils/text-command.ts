@@ -899,11 +899,9 @@ async function handleAskTextCommand(message: Message): Promise<boolean> {
   await message.react("⏳")
 
   const result = await session.client.session.prompt({
-    path: { id: session.sessionId },
-    body: {
-      ...(session.model ? { model: session.model } : {}),
-      parts: [{ type: "text", text: content }],
-    },
+    sessionID: session.sessionId,
+    ...(session.model ? { model: session.model } : {}),
+    parts: [{ type: "text", text: content }],
   })
 
   await message.reactions.removeAll().catch(() => {})

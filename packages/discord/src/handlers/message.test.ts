@@ -77,7 +77,10 @@ describe("handleMessage", () => {
   test("handles empty response from SDK", async () => {
     const mockPrompt = () => {
       return Promise.resolve({
-        data: { parts: [] },
+        data: {
+          info: null,
+          parts: [],
+        } as any,
         error: null,
       })
     }
