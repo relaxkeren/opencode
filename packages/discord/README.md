@@ -201,6 +201,37 @@ curl -X POST http://localhost:4096/session \
   -d '{"title": "test"}'
 ```
 
+### Pairing Approval
+
+When using DM policy `pairing` (default), users must be approved before they can interact with the bot in DMs. The bot will show a pairing code that the owner must approve.
+
+```bash
+# From the discord package directory
+cd packages/discord
+
+# Approve a pairing code (code is case-insensitive)
+bun run src/cli/pairing.ts pairing approve <CODE>
+
+# Example:
+bun run src/cli/pairing.ts pairing approve ABC123
+```
+
+Or if you've linked the package globally:
+
+```bash
+opencode-discord pairing approve <CODE>
+```
+
+Other pairing commands:
+
+```bash
+# List paired users and pending codes
+bun run src/cli/pairing.ts pairing list
+
+# Remove a paired user
+bun run src/cli/pairing.ts pairing remove <USER_ID>
+```
+
 ---
 
 ## Troubleshooting
