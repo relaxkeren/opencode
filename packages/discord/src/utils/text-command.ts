@@ -659,6 +659,25 @@ async function handleModelTextCommand(
       return true
     }
 
+    case "current": {
+      const model = session.model
+      if (model) {
+        await message.reply({
+          embeds: [createInfoEmbed("Current Model", `**${model.providerID}/${model.modelID}**`)],
+        })
+      } else {
+        await message.reply({
+          embeds: [
+            createInfoEmbed(
+              "Current Model",
+              "No explicit model set. Using priority: Discord command > Project config > Global config > Server default",
+            ),
+          ],
+        })
+      }
+      return true
+    }
+
     case "switch": {
       const providerID = args[0]
       const modelID = args[1]
