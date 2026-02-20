@@ -15,6 +15,7 @@ export const modelCommand = new SlashCommandBuilder()
         option.setName("all").setDescription("Show all models (not just connected)").setRequired(false),
       ),
   )
+  .addSubcommand((subcommand) => subcommand.setName("current").setDescription("Show current active model"))
   .addSubcommand((subcommand) =>
     subcommand
       .setName("switch")
@@ -108,6 +109,25 @@ export async function handleModelCommand(interaction: ChatInputCommandInteractio
         } else {
           await interaction.editReply({
             embeds: [createInfoEmbed(title, modelList || "No models found")],
+          })
+        }
+        break
+      }
+
+      case "current": {
+        const model = session.model
+        if (model) {
+          await interaction.editReply({
+            embeds: [createInfoEmbed("Current Model", `**${model.providerID}/${model.modelID}**`)],
+          })
+        } else {
+          await interaction.editReply({
+            embeds: [
+              createInfoEmbed(
+                "Current Model",
+                "No explicit model set. Using priority: Discord command > Project config > Global config > Server default",
+              ),
+            ],
           })
         }
         break

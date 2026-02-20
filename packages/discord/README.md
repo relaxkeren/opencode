@@ -78,6 +78,7 @@ bun run dev
 - `/agent switch <name>` - Switch active agent
 - `/model list` - List connected provider models
 - `/model list --all` - List all available models
+- `/model current` - Show current active model
 - `/model switch <provider> <model>` - Switch model
 
 ### MCP Tools
