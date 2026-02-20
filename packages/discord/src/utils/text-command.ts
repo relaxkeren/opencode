@@ -636,7 +636,7 @@ async function handleModelTextCommand(
         const models = Object.entries(provider.models)
           .map(([id, info]: [string, any]) => `  • ${id} - ${info.name || id}`)
           .join("\n")
-        modelList += `**${provider.name}**\n${models}\n\n`
+        modelList += `**${provider.name} (${provider.id})**\n${models}\n\n`
       }
 
       if (modelList.length > 1900) {
