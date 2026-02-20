@@ -10,7 +10,8 @@ Create an official Discord bot integration for opencode that allows users to int
 2. **Team Collaboration**: Enable teams to collaborate on coding tasks within Discord channels
 3. **Remote Access**: Allow users to interact with opencode from anywhere via Discord mobile/desktop
 4. **Slash Commands**: Support Discord-native slash commands for quick actions
-5. **Thread Persistence**: Maintain conversation context across Discord threads
+5. **Auto-Suggestions**: Display command autocomplete when typing `/` in Discord
+6. **Thread Persistence**: Maintain conversation context across Discord threads
 
 ## Architecture
 
@@ -122,7 +123,7 @@ Bot can be invited to Discord channels for team collaboration.
 
 ### 3. Slash Commands
 
-Native Discord slash commands for quick actions:
+Native Discord slash commands for quick actions. When users type `/` in Discord, they see auto-suggestions of all available commands.
 
 | Command                            | Options                                   | Description                                             |
 | ---------------------------------- | ----------------------------------------- | ------------------------------------------------------- |
@@ -148,6 +149,101 @@ Native Discord slash commands for quick actions:
 | `/connect`                         | -                                         | Start provider connect flow (OAuth or instructions)     |
 | `/status`                          | -                                         | Show opencode server and session status                 |
 | `/help`                            | -                                         | Show available commands and usage help                  |
+
+### 4. Command Registry System
+
+The command registry centralizes all command definitions, enabling:
+
+- **Auto-suggestions**: Commands registered with Discord appear when typing `/`
+- **Dynamic options**: Autocomplete for choices like session IDs, agent names, models
+- **Extensibility**: Easy to add new commands
+
+#### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Command Registry                          │
+├─────────────────────────────────────────────────────────────┤
+│  src/commands/registry.ts    → Command definitions         │
+│  src/commands/index.ts       → Command builder exports     │
+│  src/gateway/bot.ts          → Command registration on     │
+│                                bot startup                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### Command Definition Structure
+
+```typescript
+// types/command.ts
+interface CommandDefinition {
+  key: string // Unique identifier
+  builder: SlashCommandBuilder // Discord.js command builder
+  handle: (interaction: ChatInputCommandInteraction) => Promise<void>
+  autocomplete?: {
+    [argName: string]: (interaction: AutocompleteInteraction) => Promise<void>
+  }
+}
+```
+
+#### Command Registration Flow
+
+1. **Startup**: Bot starts and logs in
+2. **Collect**: Gather all command builders from registry
+3. **Deploy**: Use Discord REST API to register commands
+4. **Cache**: Store registered command IDs for updates
+
+```typescript
+// src/gateway/bot.ts - Command registration
+async function registerCommands(client: Client, token: string, clientId: string) {
+  const commands = getAllCommands() // Get from registry
+
+  const rest = new REST({ version: "10" }).setToken(token)
+  await rest.put(Routes.applicationCommands(clientId), { body: commands.map((cmd) => cmd.builder.toJSON()) })
+
+  console.log(`Registered ${commands.length} slash commands`)
+}
+```
+
+#### Dynamic Autocomplete
+
+For commands with dynamic choices (like session list, agent list), implement autocomplete handlers:
+
+```typescript
+// Example: session list autocomplete
+autocomplete: {
+  id: async (interaction: AutocompleteInteraction) => {
+    const sessions = await listUserSessions(interaction.user.id);
+    const focused = interaction.options.getFocused();
+
+    const choices = sessions
+      .filter(s => s.id.includes(focused) || s.title?.includes(focused))
+      .slice(0, 25)
+      .map(s => ({ name: s.title || s.id, value: s.id }));
+
+    await interaction.respond(choices);
+  },
+},
+```
+
+#### Commands Index
+
+```typescript
+// src/commands/index.ts
+export const commands = [
+  askCommand,
+  sessionCommand,
+  agentCommand,
+  modelCommand,
+  mcpCommand,
+  connectCommand,
+  statusCommand,
+  helpCommand,
+]
+
+export function getAllCommands(): CommandDefinition[] {
+  return commands
+}
+```
 
 ### 4. Thread-Based Sessions
 
@@ -256,49 +352,53 @@ async function handleMessage(message: Message) {
 }
 ```
 
-### Slash Command Registration
+### Slash Command Registration (Updated)
+
+Commands are now registered with Discord on bot startup to enable auto-suggestions:
 
 ```typescript
-const commands = [
-  {
-    name: "ask",
-    description: "Ask opencode a question",
-    options: [
-      {
-        name: "question",
-        type: ApplicationCommandOptionType.String,
-        description: "Your question",
-        required: true,
-      },
-    ],
-  },
-  {
-    name: "session",
-    description: "Session management",
-    options: [
-      {
-        name: "create",
-        type: ApplicationCommandOptionType.Subcommand,
-        description: "Create a new session",
-        options: [
-          {
-            name: "title",
-            type: ApplicationCommandOptionType.String,
-            description: "Session title",
-            required: false,
-          },
-        ],
-      },
-      // ... more subcommands
-    ],
-  },
-  // ... more commands
-]
+// src/gateway/bot.ts
+async start(): Promise<void> {
+  const token = this.account.token || process.env.DISCORD_BOT_TOKEN;
+  if (!token) {
+    throw new Error("No Discord token available");
+  }
 
-// Register with Discord
-const rest = new REST({ version: "10" }).setToken(token)
-await rest.put(Routes.applicationCommands(clientId), { body: commands })
+  // Login first
+  await this.client.login(token);
+
+  // Then register commands
+  await this.registerSlashCommands();
+}
+
+private async registerSlashCommands(): Promise<void> {
+  const commands = getAllCommands();
+  const clientId = this.client.application?.id;
+
+  if (!clientId) {
+    console.warn("Could not get application ID, skipping command registration");
+    return;
+  }
+
+  const rest = new REST({ version: "10" }).setToken(this.account.token);
+
+  try {
+    await rest.put(
+      Routes.applicationCommands(clientId),
+      { body: commands.map(cmd => cmd.builder.toJSON()) }
+    );
+    console.log(`Registered ${commands.length} slash commands`);
+  } catch (error) {
+    console.error("Failed to register slash commands:", error);
+  }
+}
 ```
+
+**Key differences from original spec:**
+
+- Commands registered via REST API after bot login
+- Uses `getAllCommands()` from registry instead of inline definitions
+- Includes error handling for deployment failures
 
 ### Agent Management
 

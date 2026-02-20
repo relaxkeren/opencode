@@ -7,6 +7,7 @@ import { handleMcpCommand } from "../commands/mcp.js"
 import { handleConnectCommand } from "../commands/connect.js"
 import { handleStatusCommand } from "../commands/status.js"
 import { handleHelpCommand } from "../commands/help.js"
+import { getAllCommands } from "../commands/registry.js"
 import { ConfigManager } from "../config/manager.js"
 import { PairingStore } from "../security/pairing.js"
 
@@ -15,6 +16,31 @@ export async function handleInteraction(
   _config?: ConfigManager,
   _pairing?: PairingStore,
 ) {
+  // Handle autocomplete interactions
+  if (interaction.isAutocomplete()) {
+    const commands = getAllCommands()
+    const command = commands.find((cmd) => cmd.builder.name === interaction.commandName)
+
+    if (command?.autocomplete) {
+      const focusedOption = interaction.options.getFocused(true)
+      const autocompleteHandler = command.autocomplete[focusedOption.name]
+
+      if (autocompleteHandler) {
+        try {
+          await autocompleteHandler(interaction)
+        } catch (error) {
+          console.error(`Autocomplete error for ${command.key}.${focusedOption.name}:`, error)
+          await interaction.respond([])
+        }
+        return
+      }
+    }
+
+    await interaction.respond([])
+    return
+  }
+
+  // Handle slash commands
   if (!interaction.isChatInputCommand()) return
 
   console.log(`[interaction] Received command: ${interaction.commandName}`)

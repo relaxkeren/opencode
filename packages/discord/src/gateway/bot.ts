@@ -7,11 +7,14 @@ import {
   Interaction,
   TextChannel,
   ThreadChannel,
+  REST,
+  Routes,
 } from "discord.js"
 import { ResolvedDiscordAccount } from "../types/index.js"
 import { ConfigManager } from "../config/manager.js"
 import { PairingStore } from "../security/pairing.js"
 import { resolveDmPolicy, isDmAllowed } from "../security/dm-policy.js"
+import { getCommandBuilders } from "../commands/registry.js"
 
 export interface DiscordBotOptions {
   account: ResolvedDiscordAccount
@@ -123,6 +126,47 @@ export class DiscordBot {
     }
 
     await this.client.login(token)
+
+    // Register slash commands after login
+    await this.registerSlashCommands()
+  }
+
+  private async registerSlashCommands(): Promise<void> {
+    const commandBuilders = getCommandBuilders()
+    console.log(`[${this.account.accountId}] Starting slash command registration (${commandBuilders.length} commands)`)
+
+    const clientId = this.client.application?.id
+    console.log(`[${this.account.accountId}] Got application ID: ${clientId}`)
+
+    if (!clientId) {
+      console.warn("Could not get application ID, skipping slash command registration")
+      return
+    }
+
+    const token = this.account.token || process.env.DISCORD_BOT_TOKEN
+    if (!token) {
+      console.warn("No token available for slash command registration")
+      return
+    }
+
+    const rest = new REST({ version: "10" }).setToken(token)
+
+    // Log command names for debugging
+    const commandNames = commandBuilders.map((b) => b.name)
+    console.log(`[${this.account.accountId}] Commands to register: ${commandNames.join(", ")}`)
+
+    try {
+      console.log(`[${this.account.accountId}] PUT to ${Routes.applicationCommands(clientId)}`)
+      const response = await rest.put(Routes.applicationCommands(clientId), {
+        body: commandBuilders.map((builder) => builder.toJSON()),
+      })
+      console.log(
+        `[${this.account.accountId}] Slash command registration successful! Registered ${commandBuilders.length} commands`,
+      )
+      console.log(`[${this.account.accountId}] Response:`, JSON.stringify(response).slice(0, 200))
+    } catch (error) {
+      console.error(`[${this.account.accountId}] Failed to register slash commands:`, error)
+    }
   }
 
   async stop(): Promise<void> {
