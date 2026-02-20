@@ -1,6 +1,6 @@
 import { getSessionKey, getDMSessionKey, downloadAttachment } from "./discord.js"
 import type { SessionData } from "../types/index.js"
-import { createOpencodeClient } from "@opencode-ai/sdk"
+import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import type { TextChannel, ThreadChannel, Message } from "discord.js"
 import { spawn } from "node:child_process"
 import path from "node:path"
@@ -122,7 +122,7 @@ export async function getOrCreateSession(message: Message, existingSessionId?: s
     // Create new session
     console.log("🆕 Creating new opencode session...")
     const createResult = await client.session.create({
-      body: { title: `Discord session ${new Date().toISOString()}` },
+      title: `Discord session ${new Date().toISOString()}`,
     })
 
     if (createResult.error) {

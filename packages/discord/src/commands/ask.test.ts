@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 describe("handleAskCommand SDK integration", () => {
-  test("calls session.prompt with correct SDK format", async () => {
+  test("calls session.prompt with correct v2 SDK format", async () => {
     let capturedArgs: any = null
 
     const mockPrompt = (args: any) => {
@@ -23,25 +23,55 @@ describe("handleAskCommand SDK integration", () => {
       },
     }
 
-    // Simulate the ask command calling prompt
     const question = "What is the weather?"
     await mockSession.client.session.prompt({
-      path: { id: mockSession.sessionId },
-      body: { parts: [{ type: "text", text: question }] },
+      sessionID: mockSession.sessionId,
+      parts: [{ type: "text", text: question }],
     })
 
-    // Assert correct format
     expect(capturedArgs).toBeDefined()
-    expect(capturedArgs.path).toBeDefined()
-    expect(capturedArgs.path.id).toBe("ask-session-id")
-    expect(capturedArgs.body).toBeDefined()
-    expect(capturedArgs.body.parts).toHaveLength(1)
-    expect(capturedArgs.body.parts[0].type).toBe("text")
-    expect(capturedArgs.body.parts[0].text).toBe("What is the weather?")
+    expect(capturedArgs.sessionID).toBe("ask-session-id")
+    expect(capturedArgs.parts).toHaveLength(1)
+    expect(capturedArgs.parts[0].type).toBe("text")
+    expect(capturedArgs.parts[0].text).toBe("What is the weather?")
 
-    // Ensure old flat format is NOT used
-    expect(capturedArgs.sessionID).toBeUndefined()
-    expect(capturedArgs.parts).toBeUndefined()
+    // Ensure old v1 format is NOT used
+    expect(capturedArgs.path).toBeUndefined()
+    expect(capturedArgs.body).toBeUndefined()
+  })
+
+  test("calls session.prompt with model parameter", async () => {
+    let capturedArgs: any = null
+
+    const mockPrompt = (args: any) => {
+      capturedArgs = args
+      return Promise.resolve({
+        data: {
+          parts: [{ type: "text", text: "Test answer" }],
+        },
+        error: null,
+      })
+    }
+
+    const mockSession = {
+      sessionId: "ask-session-id",
+      model: { providerID: "anthropic", modelID: "claude-sonnet-4-20250514" },
+      client: {
+        session: {
+          prompt: mockPrompt,
+        },
+      },
+    }
+
+    await mockSession.client.session.prompt({
+      sessionID: mockSession.sessionId,
+      model: mockSession.model,
+      parts: [{ type: "text", text: "Hello" }],
+    })
+
+    expect(capturedArgs.sessionID).toBe("ask-session-id")
+    expect(capturedArgs.model).toEqual({ providerID: "anthropic", modelID: "claude-sonnet-4-20250514" })
+    expect(capturedArgs.parts).toHaveLength(1)
   })
 
   test("handles response text extraction", async () => {
@@ -56,7 +86,6 @@ describe("handleAskCommand SDK integration", () => {
       error: null,
     }
 
-    // Simulate response text extraction logic from ask.ts
     const responseText =
       mockResponse.data.parts
         ?.filter((p: any) => p.type === "text")

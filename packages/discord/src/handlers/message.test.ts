@@ -1,13 +1,9 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test"
-import { handleMessage } from "../handlers/message.js"
-import { jest } from "bun:test"
+import { describe, expect, test } from "bun:test"
 
-describe("handleMessage", () => {
-  test("calls session.prompt with correct SDK format", async () => {
-    // Track the arguments passed to prompt
+describe("handleMessage SDK format", () => {
+  test("calls session.prompt with correct v2 SDK format", async () => {
     let capturedArgs: any = null
 
-    // Mock session client
     const mockPrompt = (args: any) => {
       capturedArgs = args
       return Promise.resolve({
@@ -27,25 +23,57 @@ describe("handleMessage", () => {
       },
     }
 
-    // Verify the SDK call format
+    // Call with v2 SDK format (flat parameters)
     await mockSession.client.session.prompt({
-      path: { id: mockSession.sessionId },
-      body: { parts: [{ type: "text", text: "Hello" }] },
+      sessionID: mockSession.sessionId,
+      parts: [{ type: "text", text: "Hello" }],
     })
 
-    // Assert the correct format is used
+    // Assert the correct v2 format is used
     expect(capturedArgs).toBeDefined()
-    expect(capturedArgs.path).toBeDefined()
-    expect(capturedArgs.path.id).toBe("test-session-id")
-    expect(capturedArgs.body).toBeDefined()
-    expect(capturedArgs.body.parts).toBeDefined()
-    expect(capturedArgs.body.parts).toHaveLength(1)
-    expect(capturedArgs.body.parts[0].type).toBe("text")
-    expect(capturedArgs.body.parts[0].text).toBe("Hello")
+    expect(capturedArgs.sessionID).toBe("test-session-id")
+    expect(capturedArgs.parts).toBeDefined()
+    expect(capturedArgs.parts).toHaveLength(1)
+    expect(capturedArgs.parts[0].type).toBe("text")
+    expect(capturedArgs.parts[0].text).toBe("Hello")
 
-    // Ensure old flat format is NOT used
-    expect(capturedArgs.sessionID).toBeUndefined()
-    expect(capturedArgs.parts).toBeUndefined()
+    // Ensure old v1 format is NOT used
+    expect(capturedArgs.path).toBeUndefined()
+    expect(capturedArgs.body).toBeUndefined()
+  })
+
+  test("calls session.prompt with model parameter", async () => {
+    let capturedArgs: any = null
+
+    const mockPrompt = (args: any) => {
+      capturedArgs = args
+      return Promise.resolve({
+        data: {
+          parts: [{ type: "text", text: "Test response" }],
+        },
+        error: null,
+      })
+    }
+
+    const mockSession = {
+      sessionId: "test-session-id",
+      model: { providerID: "openai", modelID: "gpt-4o" },
+      client: {
+        session: {
+          prompt: mockPrompt,
+        },
+      },
+    }
+
+    await mockSession.client.session.prompt({
+      sessionID: mockSession.sessionId,
+      model: mockSession.model,
+      parts: [{ type: "text", text: "Hello" }],
+    })
+
+    expect(capturedArgs.sessionID).toBe("test-session-id")
+    expect(capturedArgs.model).toEqual({ providerID: "openai", modelID: "gpt-4o" })
+    expect(capturedArgs.parts).toHaveLength(1)
   })
 
   test("handles response from SDK with info.content", async () => {
@@ -62,7 +90,6 @@ describe("handleMessage", () => {
     const result = await mockPrompt()
     const response = result.data
 
-    // Check info.content first (matching Slack integration)
     const responseText =
       response.info?.content ||
       response.parts
@@ -88,10 +115,8 @@ describe("handleMessage", () => {
     const result = await mockPrompt()
     const response = result.data
 
-    // Verify empty parts array
     expect(result.data.parts).toHaveLength(0)
 
-    // Simulate the fallback message logic
     const responseText =
       response.info?.content ||
       response.parts
@@ -118,31 +143,26 @@ describe("handleMessage", () => {
   })
 })
 
-describe("SDK API Format Compliance", () => {
-  test("v1 SDK uses path.body structure", () => {
-    // This test documents the expected SDK v1 format
-    const expectedV1Format = {
-      path: { id: "session-id" },
-      body: {
-        parts: [{ type: "text", text: "message" }],
-      },
-    }
-
-    // Verify structure
-    expect(expectedV1Format).toHaveProperty("path.id")
-    expect(expectedV1Format).toHaveProperty("body.parts")
-    expect(Array.isArray(expectedV1Format.body.parts)).toBe(true)
-  })
-
-  test("incorrect flat format should be rejected", () => {
-    // This test documents the incorrect format that was causing the bug
-    const incorrectFlatFormat = {
+describe("SDK v2 Format Compliance", () => {
+  test("v2 SDK uses flat parameter structure", () => {
+    const expectedV2Format = {
       sessionID: "session-id",
       parts: [{ type: "text", text: "message" }],
     }
 
-    // This format is wrong because it doesn't follow the SDK's expected structure
-    expect(incorrectFlatFormat).not.toHaveProperty("path")
-    expect(incorrectFlatFormat).not.toHaveProperty("body")
+    expect(expectedV2Format).toHaveProperty("sessionID")
+    expect(expectedV2Format).toHaveProperty("parts")
+    expect(Array.isArray(expectedV2Format.parts)).toBe(true)
+  })
+
+  test("v2 SDK accepts model parameter", () => {
+    const params = {
+      sessionID: "session-id",
+      model: { providerID: "openai", modelID: "gpt-4o" },
+      parts: [{ type: "text", text: "message" }],
+    }
+
+    expect(params.model).toHaveProperty("providerID")
+    expect(params.model).toHaveProperty("modelID")
   })
 })

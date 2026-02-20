@@ -108,8 +108,6 @@ export async function handleMessage(message: Message, _config?: ConfigManager, _
       return
     }
 
-    // Build response text - extract from parts array
-    console.log("📊 Full response:", JSON.stringify(result, null, 2))
     const response = result.data
     if (!response) {
       console.error(`[message:${msgId}] ❌ No response received.`)
