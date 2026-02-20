@@ -21,7 +21,6 @@
     "@types/node": "catalog:",
     "bun-types": "catalog:",
     "typescript": "catalog:",
-    "@typescript/native-preview": "catalog:",
-    "bun:test": "catalog:"
+    "@typescript/native-preview": "catalog:"
   }
 }
