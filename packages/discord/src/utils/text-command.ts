@@ -666,11 +666,13 @@ async function handleModelTextCommand(
           embeds: [createInfoEmbed("Current Model", `**${model.providerID}/${model.modelID}**`)],
         })
       } else {
+        const configResult = await session.client.config.get()
+        const serverDefault = configResult.data?.model || "not configured"
         await message.reply({
           embeds: [
             createInfoEmbed(
               "Current Model",
-              "No explicit model set. Using priority: Discord command > Project config > Global config > Server default",
+              `No explicit model set. Using priority: Discord command > Project config > Global config > Server default (${serverDefault})`,
             ),
           ],
         })
