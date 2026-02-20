@@ -1,6 +1,7 @@
 import { existsSync } from "fs"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import { dirname } from "path"
+import { homedir } from "os"
 import { DiscordConfig, DiscordConfigSchema, ResolvedDiscordAccount } from "../types/index.js"
 
 const CONFIG_FILE = "opencode.discord.json"
@@ -10,7 +11,7 @@ export class ConfigManager {
   private config: DiscordConfig | null = null
 
   constructor(stateDir?: string) {
-    const baseDir = stateDir || process.env.OPENCODE_STATE_DIR || `${process.env.HOME}/.opencode`
+    const baseDir = stateDir || process.env.OPENCODE_STATE_DIR || `${homedir()}/.opencode`
     this.configPath = `${baseDir}/${CONFIG_FILE}`
   }
 

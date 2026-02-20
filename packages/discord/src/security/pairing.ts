@@ -1,6 +1,7 @@
 import { existsSync } from "fs"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import { dirname } from "path"
+import { homedir } from "os"
 
 interface PairingRequest {
   code: string
@@ -24,7 +25,7 @@ export class PairingStore {
   private deletedCodes: Set<string> = new Set() // Track codes deleted locally
 
   constructor(stateDir?: string) {
-    const baseDir = stateDir || process.env.OPENCODE_STATE_DIR || `${process.env.HOME}/.opencode`
+    const baseDir = stateDir || process.env.OPENCODE_STATE_DIR || `${homedir()}/.opencode`
     this.pairingPath = `${baseDir}/${PAIRING_FILE}`
   }
 
