@@ -1,22 +1,8 @@
 #!/usr/bin/env pwsh
-# Simple launcher for opencode-discord bot from source
+# Launcher for opencode-discord bot from source with restart support
 
-$BotDir = Split-Path $PSScriptRoot -Parent
-$PidFile = Join-Path $PSScriptRoot "opencode-discord.pid"
-
-# Check if already running
-if (Test-Path $PidFile) {
-    $ExistingPid = Get-Content $PidFile -ErrorAction SilentlyContinue
-    if ($ExistingPid) {
-        try {
-            $null = Get-Process -Id $ExistingPid -ErrorAction Stop
-            Write-Host "Bot is already running with PID $ExistingPid"
-            exit 1
-        } catch {
-            Remove-Item $PidFile -Force
-        }
-    }
-}
+$BotDir = Split-Path $Script:MyInvocation.MyCommand.Path -Parent | Split-Path -Parent
+$PidFile = Join-Path $Script:MyInvocation.MyCommand.Path "opencode-discord.pid"
 
 # Check if bun is available
 try {
@@ -34,23 +20,37 @@ try {
     exit 1
 }
 
-Write-Host "Starting opencode-discord bot from source..."
+# Exit code that signals restart
+$RESTART_EXIT_CODE = 42
 
-# Start the bot using bun
-$Process = Start-Process -FilePath "bun" -ArgumentList "run", "src/index.ts" -WorkingDirectory $BotDir -WindowStyle Hidden -PassThru
+while ($true) {
+    Write-Host "Starting opencode-discord bot from source..."
 
-# Save PID
-$Process.Id | Out-File $PidFile
+    # Start the bot using bun
+    $Process = Start-Process -FilePath "bun" -ArgumentList "run", "src/index.ts" -WorkingDirectory $BotDir -WindowStyle Hidden -PassThru -Wait
 
-# Quick health check
-Start-Sleep -Milliseconds 500
-if ($Process.HasExited) {
-    Write-Error "Bot exited immediately (code: $($Process.ExitCode))"
+    # Save PID
+    $Process.Id | Out-File $PidFile
+
+    # Wait for process to exit
+    $Process.WaitForExit()
+    $ExitCode = $Process.ExitCode
+
+    # Remove PID file
     Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
-    exit 1
-}
 
-Write-Host "Bot started with PID: $($Process.Id)"
-Write-Host "PID file: $PidFile"
-Write-Host ""
-Write-Host "To stop: .\stop-bot.ps1"
+    # Check if restart was requested
+    if ($ExitCode -eq $RESTART_EXIT_CODE) {
+        Write-Host "🔄 Restart requested. Restarting bot..."
+        Start-Sleep -Seconds 2
+        continue
+    }
+
+    # Any other exit code means stop
+    if ($ExitCode -ne 0) {
+        Write-Host "Bot exited with code: $ExitCode"
+    } else {
+        Write-Host "Bot stopped normally."
+    }
+    break
+}

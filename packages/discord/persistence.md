@@ -115,9 +115,23 @@ async function createOpencodeServer(options?: {
 
 ---
 
+## Bot Management Commands
+
+### `/stop` Command
+
+Stops the Discord bot gracefully from Discord chat.
+
+**Implementation:**
+- Sends confirmation message before stopping
+- Exits with code `0` after 1 second delay
+
+**Files:**
+- `src/commands/stop.ts` — Discord slash command handler
+
+---
+
 ## Future Enhancements
 
 - Add search/filter to `/session list` (by title, date range)
 - Add pagination for users with many sessions
 - Add `/session archive` to hide old sessions from list
-- Show session directory/project in list output

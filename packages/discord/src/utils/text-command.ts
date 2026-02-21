@@ -30,7 +30,7 @@ export function parseTextCommand(content: string): ParsedCommand | null {
 
   console.log("[parseTextCommand] command:", command, "subcommand:", subcommand, "args:", args)
 
-  const validCommands = ["session", "agent", "model", "mcp", "status", "help", "ask", "connect"]
+  const validCommands = ["session", "agent", "model", "mcp", "status", "help", "ask", "connect", "stop"]
 
   if (!validCommands.includes(command)) {
     console.log("[parseTextCommand] Command not in valid list")
@@ -80,6 +80,8 @@ export async function handleTextCommand(message: Message, content: string): Prom
         return await handleAskTextCommand(message)
       case "connect":
         return await handleConnectTextCommand(message)
+      case "stop":
+        return await handleStopTextCommand(message)
       default:
         return false
     }
@@ -976,5 +978,19 @@ async function handleConnectTextCommand(message: Message): Promise<boolean> {
   await message.reply({
     content: `To connect an AI provider:\n\n1. Create a config file at \`~/.config/opencode/opencode.json\`:\n\`\`\`json\n{\n  "$schema": "https://opencode.ai/config.json",\n  "model": "moonshotai/kimi-k2.5"\n}\n\`\`\`\n\n2. Add your auth keys to \`~/.local/share/opencode/auth.json\`:\n\`\`\`json\n{\n  "moonshotai": {\n    "type": "api",\n    "key": "sk-..."\n  }\n}\n\`\`\`\n\nFor more providers, check: <https://opencode.ai/docs/providers>`,
   })
+  return true
+}
+
+async function handleStopTextCommand(message: Message): Promise<boolean> {
+  await message.reply({
+    embeds: [createSuccessEmbed("Stopping Bot", "The bot is shutting down...")],
+  })
+
+  // Wait a moment for the message to be sent, then exit
+  setTimeout(() => {
+    console.log("[stop] Shutting down bot from text command...")
+    process.exit(0)
+  }, 1000)
+
   return true
 }

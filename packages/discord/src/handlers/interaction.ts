@@ -7,6 +7,7 @@ import { handleMcpCommand } from "../commands/mcp.js"
 import { handleConnectCommand } from "../commands/connect.js"
 import { handleStatusCommand } from "../commands/status.js"
 import { handleHelpCommand } from "../commands/help.js"
+import { handleStopCommand } from "../commands/stop.js"
 import { getAllCommands } from "../commands/registry.js"
 import { ConfigManager } from "../config/manager.js"
 import { PairingStore } from "../security/pairing.js"
@@ -71,6 +72,9 @@ export async function handleInteraction(
         break
       case "help":
         await handleHelpCommand(interaction)
+        break
+      case "stop":
+        await handleStopCommand(interaction)
         break
       default:
         console.log(`Unknown command: ${commandName}`)

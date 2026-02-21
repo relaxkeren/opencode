@@ -13,6 +13,7 @@ import { mcpCommand, handleMcpCommand } from "./mcp.js"
 import { connectCommand, handleConnectCommand } from "./connect.js"
 import { statusCommand, handleStatusCommand } from "./status.js"
 import { helpCommand, handleHelpCommand } from "./help.js"
+import { stopCommand, handleStopCommand } from "./stop.js"
 import { listSessions } from "../utils/session.js"
 
 export interface CommandDefinition {
@@ -119,6 +120,12 @@ const commands: CommandDefinition[] = [
     builder: helpCommand,
     description: helpCommand.description,
     handle: handleHelpCommand,
+  },
+  {
+    key: "stop",
+    builder: stopCommand,
+    description: stopCommand.description,
+    handle: handleStopCommand,
   },
 ]
 
