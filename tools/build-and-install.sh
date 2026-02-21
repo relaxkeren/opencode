@@ -39,8 +39,8 @@ if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
 fi
 
 echo "==> Installing to $INSTALL_DIR..."
-LINK="$INSTALL_DIR/opencode"
-[[ -e "$LINK" ]] && rm -f "$LINK"
-ln -sf "$REPO_ROOT/$BINARY" "$LINK"
+TARGET="$INSTALL_DIR/opencode"
+[[ -e "$TARGET" ]] && rm -f "$TARGET"
+cp -f "$REPO_ROOT/$BINARY" "$TARGET"
 
 echo "Done. Verify with: opencode --version"
