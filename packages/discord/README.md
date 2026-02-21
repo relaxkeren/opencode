@@ -47,6 +47,37 @@ cp .env.example .env
 bun run dev
 ```
 
+### Running with PID Tracking (PowerShell Scripts)
+
+For long-running deployments, use the provided PowerShell scripts that track the process ID:
+
+**Start the bot:**
+```powershell
+# From packages/discord directory
+powershell -ExecutionPolicy Bypass -File script/start.ps1
+```
+
+This will:
+- Check if the bot is already running (via PID file)
+- Start the bot with `bun run src/index.ts`
+- Save the PID to `script/opencode-discord.pid`
+- Report the process ID
+
+**Stop the bot:**
+```powershell
+# From packages/discord directory
+powershell -ExecutionPolicy Bypass -File script/stop.ps1
+```
+
+This will:
+- Read the PID from the PID file
+- Kill the process
+- Clean up the PID file
+
+**Requirements for scripts:**
+- `bun` must be in your PATH
+- `opencode` must be in your PATH (the bot spawns OpenCode servers)
+
 ---
 
 ## Commands
@@ -188,6 +219,25 @@ bun run typecheck
 # Run tests
 bun test
 ```
+
+### Building Standalone Binary
+
+Compile the bot to a standalone executable:
+
+```bash
+# Build for current platform only
+bun run script/build.ts --single
+
+# Build for all platforms (linux, macos, windows)
+bun run script/build.ts
+```
+
+The compiled binary will be in:
+```
+dist/opencode-discord-<platform>-<arch>/bin/opencode-discord[.exe]
+```
+
+**Note:** The compiled binary expects `opencode` to be available in your PATH. If not found, it will exit with an error.
 
 ### Testing Manually
 

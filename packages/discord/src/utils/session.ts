@@ -3,31 +3,22 @@ import type { SessionData } from "../types/index.js"
 import { createOpencodeClient } from "@opencode-ai/sdk/v2"
 import type { TextChannel, ThreadChannel, Message } from "discord.js"
 import { spawn } from "node:child_process"
-import path from "node:path"
-import { fileURLToPath } from "node:url"
 
 const sessions = new Map<string, SessionData>()
 
-async function createOpencodeFromSource(options?: { port?: number; timeout?: number }) {
+const OPENCODE_BINARY = "opencode"
+
+async function createOpencodeServer(options?: { port?: number; timeout?: number }) {
   const port = options?.port ?? 0
   const timeout = options?.timeout ?? 5000
 
-  const currentDir = path.dirname(fileURLToPath(import.meta.url))
   const args = [
-    `run`,
-    `--cwd`,
-    path.resolve(currentDir, "../../../../packages/opencode"),
-    `--conditions=browser`,
-    `src/index.ts`,
     `serve`,
     `--hostname=127.0.0.1`,
     `--port=${port}`,
   ]
 
-  console.log("🚀 Starting opencode server from source...")
-  console.log("Command: bun", args.join(" "))
-
-  const proc = spawn(`bun`, args, {
+  const proc = spawn(OPENCODE_BINARY, args, {
     env: {
       ...process.env,
       // Don't override config - let server load user's global config from ~/.config/opencode
@@ -39,10 +30,11 @@ async function createOpencodeFromSource(options?: { port?: number; timeout?: num
       reject(new Error(`Timeout waiting for server to start after ${timeout}ms`))
     }, timeout)
     let output = ""
+    let errorOutput = ""
+
     proc.stdout?.on("data", (chunk) => {
       const text = chunk.toString()
       output += text
-      console.log("[server stdout]", text)
       const lines = output.split("\n")
       for (const line of lines) {
         if (line.startsWith("opencode server listening")) {
@@ -56,22 +48,27 @@ async function createOpencodeFromSource(options?: { port?: number; timeout?: num
         }
       }
     })
+
     proc.stderr?.on("data", (chunk) => {
-      const text = chunk.toString()
-      output += text
-      console.log("[server stderr]", text)
+      errorOutput += chunk.toString()
     })
+
     proc.on("exit", (code) => {
       clearTimeout(id)
       let msg = `Server exited with code ${code}`
-      if (output.trim()) {
-        msg += `\nServer output: ${output}`
+      if (errorOutput.trim()) {
+        msg += `\nError: ${errorOutput}`
+      }
+      // Check if spawn failed (code null usually means not found)
+      if (code === null) {
+        msg = `Failed to start opencode. Is 'opencode' in your PATH?`
       }
       reject(new Error(msg))
     })
+
     proc.on("error", (error) => {
       clearTimeout(id)
-      reject(error)
+      reject(new Error(`Failed to start opencode: ${error.message}. Is 'opencode' in your PATH?`))
     })
   })
 
@@ -105,10 +102,8 @@ export async function getOrCreateSession(message: Message, existingSessionId?: s
     return existing
   }
 
-  // Create new opencode instance from source
-  console.log("🚀 Starting opencode server...")
-  const opencode = await createOpencodeFromSource({ port: 0 })
-  console.log("✅ Opencode server ready")
+  // Create new opencode server instance
+  const opencode = await createOpencodeServer({ port: 0 })
 
   const { client, server } = opencode
 
