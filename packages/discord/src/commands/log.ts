@@ -24,14 +24,10 @@ export async function handleLogCommand(interaction: ChatInputCommandInteraction<
 
   try {
     const possiblePaths = [
-      // Actual user profile (where OpenCode daemon writes logs)
+      // Actual user profile (where OpenCode daemon writes logs when run as service)
       path.join("C:\\Users\\Ke", ".local", "share", "opencode", "log", "discord-out.log"),
-      // Windows Service user profile path (LocalSystem)
-      path.join(process.env.USERPROFILE || os.homedir(), ".local", "share", "opencode", "log", "discord-out.log"),
-      // Manual run path
+      // Current user's home directory (when run manually or as user service)
       path.join(os.homedir(), ".local", "share", "opencode", "log", "discord-out.log"),
-      // Legacy path relative to cwd
-      path.join(process.cwd(), "logs", "service-out.log"),
     ]
     console.log("[log] USERPROFILE:", process.env.USERPROFILE)
     console.log("[log] homedir:", os.homedir())
