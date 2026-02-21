@@ -128,6 +128,31 @@ Stops the Discord bot gracefully from Discord chat.
 **Files:**
 - `src/commands/stop.ts` — Discord slash command handler
 
+### `/restart` Command
+
+Restarts the Discord bot when running as a Windows Service. This reloads the bot code without manual intervention.
+
+**Usage:**
+```
+/restart
+```
+
+**How it works:**
+1. Sends "Restarting..." confirmation to Discord
+2. Spawns a detached PowerShell process
+3. PowerShell waits 2 seconds, then runs `Restart-Service OpenCodeDiscordBot`
+4. Bot process exits
+5. Windows Service Manager restarts the service
+
+**Requirements:**
+- Bot must be running as a Windows Service
+- Service name must be `OpenCodeDiscordBot` (default)
+
+**Note:** If running manually (not as a service), this command will just stop the bot.
+
+**Files:**
+- `src/commands/restart.ts` — Discord slash command handler
+
 ---
 
 ## Windows Service Installation

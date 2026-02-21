@@ -14,6 +14,7 @@ import { connectCommand, handleConnectCommand } from "./connect.js"
 import { statusCommand, handleStatusCommand } from "./status.js"
 import { helpCommand, handleHelpCommand } from "./help.js"
 import { stopCommand, handleStopCommand } from "./stop.js"
+import { restartCommand, handleRestartCommand } from "./restart.js"
 import { listSessions } from "../utils/session.js"
 
 export interface CommandDefinition {
@@ -126,6 +127,12 @@ const commands: CommandDefinition[] = [
     builder: stopCommand,
     description: stopCommand.description,
     handle: handleStopCommand,
+  },
+  {
+    key: "restart",
+    builder: restartCommand,
+    description: restartCommand.description,
+    handle: handleRestartCommand,
   },
 ]
 

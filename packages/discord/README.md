@@ -143,15 +143,32 @@ Get-Service OpenCodeDiscordBot
 ```
 
 **View logs:**
+
+Default log location (when installed via service script):
+```
+C:\Users\Ke\.local\share\opencode\log\discord-out.log
+C:\Users\Ke\.local\share\opencode\log\discord-err.log
+```
+
+View logs via PowerShell:
 ```powershell
 # Recent output
-Get-Content .\logs\service-out.log -Tail 50
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Tail 50
 
 # Recent errors
-Get-Content .\logs\service-err.log -Tail 50
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log" -Tail 50
 
 # Watch logs in real-time
-Get-Content .\logs\service-out.log -Wait
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Wait
+
+# Search for errors
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log" | Select-String "ERROR" -Context 2
+```
+
+**Change log location:**
+```powershell
+# Run as Administrator to change log location
+.\script\set-log-location.ps1 -LogDir "C:\custom\log\path"
 ```
 
 **Windows Services GUI:**
@@ -187,7 +204,7 @@ powershell -ExecutionPolicy Bypass -File script/uninstall-service.ps1 -KeepLogs
 
 2. **Check logs for errors:**
    ```powershell
-   Get-Content .\logs\service-err.log
+   Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log"
    ```
 
 3. **Test running manually first:**
@@ -266,6 +283,11 @@ Restart-Service OpenCodeDiscordBot
 ### Providers
 
 - `/connect` - Connect AI provider (OAuth or instructions)
+
+### Bot Management (Windows Service)
+
+- `/stop` - Stop the Discord bot (graceful shutdown)
+- `/restart` - Restart the Discord bot (when running as Windows Service)
 
 ---
 

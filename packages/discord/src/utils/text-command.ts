@@ -1,5 +1,6 @@
 import type { Message } from "discord.js"
 import type { User, TextChannel, ThreadChannel, Channel } from "discord.js"
+import { spawn } from "node:child_process"
 import { getSessionKey, getDMSessionKey } from "../utils/discord.js"
 import {
   listSessions,
@@ -30,7 +31,7 @@ export function parseTextCommand(content: string): ParsedCommand | null {
 
   console.log("[parseTextCommand] command:", command, "subcommand:", subcommand, "args:", args)
 
-  const validCommands = ["session", "agent", "model", "mcp", "status", "help", "ask", "connect", "stop"]
+  const validCommands = ["session", "agent", "model", "mcp", "status", "help", "ask", "connect", "stop", "restart"]
 
   if (!validCommands.includes(command)) {
     console.log("[parseTextCommand] Command not in valid list")
@@ -82,6 +83,8 @@ export async function handleTextCommand(message: Message, content: string): Prom
         return await handleConnectTextCommand(message)
       case "stop":
         return await handleStopTextCommand(message)
+      case "restart":
+        return await handleRestartTextCommand(message)
       default:
         return false
     }
@@ -989,6 +992,38 @@ async function handleStopTextCommand(message: Message): Promise<boolean> {
   // Wait a moment for the message to be sent, then exit
   setTimeout(() => {
     console.log("[stop] Shutting down bot from text command...")
+    process.exit(0)
+  }, 1000)
+
+  return true
+}
+
+async function handleRestartTextCommand(message: Message): Promise<boolean> {
+  const serviceName = "OpenCodeDiscordBot"
+  
+  await message.reply({
+    embeds: [createSuccessEmbed("🔄 Restarting Bot", "The bot is restarting. This may take a few seconds...")],
+  })
+
+  // Spawn a detached PowerShell process to restart the service
+  const restartScript = `
+    Start-Sleep -Seconds 2
+    Restart-Service -Name "${serviceName}" -Force
+  `
+  
+  console.log("[restart] Spawning service restart process from text command...")
+  
+  const child = spawn("powershell.exe", ["-Command", restartScript], {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  })
+  
+  child.unref()
+  
+  // Exit the bot process
+  setTimeout(() => {
+    console.log("[restart] Exiting bot process for restart...")
     process.exit(0)
   }, 1000)
 
