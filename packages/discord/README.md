@@ -125,18 +125,48 @@ This will:
 
 ## Architecture
 
-The bot embeds an OpenCode server and uses the SDK to communicate with AI providers.
+### Overview
+
+The Discord bot runs as a standalone process that spawns OpenCode server instances for each user session.
 
 ```
-Discord User
-    ↓ (message)
-Discord Bot (discord.js)
-    ↓ (handleMessage)
-OpenCode SDK Client
-    ↓ (session.prompt)
-OpenCode Server (localhost)
-    ↓ (process)
-AI Provider (moonshotai, google, etc.)
+Discord Bot Process (bun run src/index.ts)
+    │
+    ├── Spawns ──► OpenCode Server #1 (localhost:xxxxx) ◄── User A's session
+    │                  ├── API (for bot)
+    │                  └── Web UI (localhost only)
+    │
+    ├── Spawns ──► OpenCode Server #2 (localhost:yyyyy) ◄── User B's session
+    │                  ├── API (for bot)
+    │                  └── Web UI (localhost only)
+    │
+    └── Connects to AI Providers (moonshotai, anthropic, etc.)
+```
+
+### Process Model
+
+**When the Discord bot starts:**
+1. Discord bot process starts (`bun run src/index.ts` or compiled binary)
+2. Waits for Discord messages
+
+**When a user sends a message:**
+1. Bot spawns `opencode serve --hostname=127.0.0.1 --port=0`
+2. OpenCode server picks a random available port
+3. Bot connects via SDK to `http://127.0.0.1:<port>`
+4. Session is created and stored in memory
+
+**When the Discord bot stops:**
+- All spawned OpenCode server processes are killed
+- PID file is cleaned up (if using scripts)
+
+### Viewing Active Processes
+
+```powershell
+# See Discord bot and OpenCode server processes
+Get-Process | Where-Object { $_.Name -like "*opencode*" -or $_.Name -like "*bun*" }
+
+# See network ports used by OpenCode servers
+Get-NetTCPConnection -OwningProcess (Get-Process opencode).Id | Select-Object LocalAddress, LocalPort
 ```
 
 ### Session Management
@@ -144,11 +174,11 @@ AI Provider (moonshotai, google, etc.)
 Each user/channel combination gets its own session:
 
 - **Session ID** - Unique identifier for the conversation
-- **SDK Client** - OpenCode SDK instance
+- **SDK Client** - OpenCode SDK instance connected to the server
 - **Server Handle** - Local OpenCode server process
 - **Model Config** - Selected provider and model
 
-Sessions are stored in memory and persist for the bot's lifetime.
+Sessions are stored in memory and persist for the bot's lifetime (or until timeout).
 
 ### Message Flow
 
@@ -156,8 +186,9 @@ Sessions are stored in memory and persist for the bot's lifetime.
 2. Bot extracts text and attachments
 3. Get or create session for user/channel
 4. Send prompt to OpenCode via SDK
-5. Extract response from parts array
-6. Reply to Discord
+5. OpenCode processes with AI provider
+6. Extract response from parts array
+7. Reply to Discord
 
 ### Model Selection Priority
 
@@ -165,6 +196,58 @@ Sessions are stored in memory and persist for the bot's lifetime.
 2. **Project config** (`.opencode/opencode.jsonc`)
 3. **Global config** (`~/.config/opencode/opencode.json`)
 4. **Server default** - first available provider
+
+---
+
+## Web Interface
+
+### Status
+
+Each spawned OpenCode server includes a **web interface**, but with limitations:
+
+- ✅ **Running:** Web UI is active on each server
+- ✅ **API:** Discord bot uses the API endpoints
+- ❌ **Localhost Only:** Bound to `127.0.0.1` (not accessible from other devices)
+
+### Accessing the Web UI
+
+Since servers are bound to `127.0.0.1`, the web interface is only accessible from the **same machine** running the bot:
+
+```
+http://127.0.0.1:<port>/session/<session-id>
+```
+
+**Note:** Each user session has its own server on a different random port.
+
+### Making Web UI Network-Accessible (Advanced)
+
+**⚠️ Security Warning:** Exposing the web UI to your network allows anyone on the network to access sessions without authentication.
+
+To bind to all interfaces (`0.0.0.0`), edit `src/utils/session.ts`:
+
+```typescript
+// Change this line:
+`serve`, `--hostname=127.0.0.1`, `--port=${port}`
+
+// To:
+`serve`, `--hostname=0.0.0.0`, `--port=${port}`
+```
+
+Then rebuild and restart the bot.
+
+### Checking Active Web Interfaces
+
+```powershell
+# List all OpenCode servers and their ports
+$opencodeProcesses = Get-Process opencode -ErrorAction SilentlyContinue
+foreach ($proc in $opencodeProcesses) {
+    $connections = Get-NetTCPConnection -OwningProcess $proc.Id -ErrorAction SilentlyContinue | 
+        Where-Object { $_.State -eq "Listen" }
+    foreach ($conn in $connections) {
+        Write-Host "PID $($proc.Id): http://$($conn.LocalAddress):$($conn.LocalPort)"
+    }
+}
+```
 
 ---
 
@@ -286,6 +369,65 @@ bun run src/cli/pairing.ts pairing remove <USER_ID>
 ---
 
 ## Troubleshooting
+
+### Bot Already Running (PID File Exists)
+
+**Error:** "Bot is already running with PID xxx"
+
+**Cause:** The PID file from a previous run still exists.
+
+**Fix:**
+```powershell
+# Check if process actually exists
+Get-Process -Id <PID>  # If this fails, it's a stale PID file
+
+# Remove stale PID file
+Remove-Item script/opencode-discord.pid
+
+# Or use the stop script
+powershell -ExecutionPolicy Bypass -File script/stop.ps1
+```
+
+### Orphaned OpenCode Processes
+
+**Issue:** OpenCode server processes left running after bot crashes.
+
+**Symptom:** Multiple `opencode` processes in Task Manager.
+
+**Fix:**
+```powershell
+# Kill all OpenCode server processes (keeps Discord bot)
+Get-Process opencode | Stop-Process -Force
+
+# Or kill everything including bot
+Get-Process | Where-Object { $_.Name -like "*opencode*" -or $_.ProcessName -eq "bun" } | Stop-Process -Force
+Remove-Item script/opencode-discord.pid -ErrorAction SilentlyContinue
+```
+
+### "'opencode' not found in PATH"
+
+**Error:** Bot fails to start because it can't find the `opencode` binary.
+
+**Cause:** The Discord bot spawns OpenCode servers as child processes.
+
+**Fix:**
+```powershell
+# Add opencode to your PATH (adjust path as needed)
+$env:PATH += ";C:\path\to\opencode\bin"
+
+# Or create a symlink in a directory already in PATH
+New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\opencode.exe" -Target "C:\path\to\opencode\bin\opencode.exe"
+```
+
+### Web UI Not Accessible
+
+**Issue:** Can't access the web interface from another device.
+
+**Cause:** Servers are bound to `127.0.0.1` (localhost only) for security.
+
+**Status:** This is by design. The web UI is only meant for local debugging.
+
+**Workaround:** See "Making Web UI Network-Accessible" in the Architecture section.
 
 ### "ProviderModelNotFoundError" for anthropic/claude
 
