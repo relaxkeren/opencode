@@ -29,7 +29,7 @@ Official Discord bot for [opencode](https://github.com/opencode-ai/opencode) - i
    - Use Slash Commands
 4. Copy and open the generated URL
 
-### 3. Configure & Run
+### 3. Configure
 
 ```bash
 # Clone the repository
@@ -42,224 +42,76 @@ bun install
 # Configure environment
 cp .env.example .env
 # Edit .env and add your bot token
-
-# Run the bot
-bun run dev
 ```
-
-### Running with PID Tracking (PowerShell Scripts)
-
-For long-running deployments, use the provided PowerShell scripts that track the process ID:
-
-**Start the bot:**
-
-```powershell
-# From packages/discord directory
-powershell -ExecutionPolicy Bypass -File script/start.ps1
-```
-
-This will:
-
-- Check if the bot is already running (via PID file)
-- Start the bot with `bun run src/index.ts`
-- Save the PID to `script/opencode-discord.pid`
-- Report the process ID
-
-**Stop the bot:**
-
-```powershell
-# From packages/discord directory
-powershell -ExecutionPolicy Bypass -File script/stop.ps1
-```
-
-This will:
-
-- Read the PID from the PID file
-- Kill the process
-- Clean up the PID file
-
-**Requirements for scripts:**
-
-- `bun` must be in your PATH
-- `opencode` must be in your PATH (the bot spawns OpenCode servers)
 
 ---
 
-## Windows Service Installation (Production)
+## Installation
 
-For production deployments, install the Discord bot as a Windows Service to run automatically on startup.
+### Development Mode
 
-### Prerequisites
+For development with hot reload:
 
-- Windows 10/11 or Windows Server
-- PowerShell running as Administrator
-- Bun installed and in PATH
-- OpenCode installed and in PATH
-- NSSM (will be auto-downloaded or install via `choco install nssm`)
-
-### Install Service
-
-```powershell
-# From packages/discord directory, as Administrator
-powershell -ExecutionPolicy Bypass -File script/install-service.ps1
+```bash
+bun run dev
 ```
 
-**Options:**
+### Production Mode (Binary)
+
+Build and install the executable:
 
 ```powershell
-# Custom service name
-powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -ServiceName "MyDiscordBot" -DisplayName "My Discord Bot"
+# From opencode repository root
+tools\build-and-install-discord-bot.ps1
 
-# Manual start (not auto-start)
-powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -AutoStart:$false
-
-# Reinstall (force overwrite existing)
-powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -Force
+# Verify installation
+opencode-discord --version
+# Output: opencode-discord 1.0.0-abc1234
 ```
 
-### Service Features
-
-- **Auto-start**: Service starts automatically on Windows boot
-- **Auto-restart**: Service restarts automatically if bot crashes
-- **Log rotation**: Logs rotate at 10MB (keeps history)
-- **Graceful shutdown**: Handles Windows shutdown/restart signals
-- **No console window**: Runs silently in background
-- **Failure recovery**: Restarts on first failure after 3 seconds, second after 6 seconds
-
-### Manage Service
-
-**Start the service:**
-
+**Usage:**
 ```powershell
-Start-Service OpenCodeDiscordBot
+# Run in production mode (info/warn/error logs)
+opencode-discord
+
+# Run in debug mode (verbose logging)
+opencode-discord --dev
+
+# Show version
+opencode-discord --version
 ```
 
-**Stop the service:**
+### Windows Service (Production)
+
+Install the bot as a Windows Service for automatic startup:
 
 ```powershell
-Stop-Service OpenCodeDiscordBot
+# As Administrator
+cd packages/discord
+powershell -ExecutionPolicy Bypass -File script\install-service.ps1
 ```
 
-**Restart the service:**
+**Features:**
+- Auto-starts on Windows boot
+- Automatic restart on failure
+- Binary handles all logging internally
+- No console window (runs in background)
 
+**Manage Service:**
 ```powershell
-Restart-Service OpenCodeDiscordBot
-```
-
-**Check status:**
-
-```powershell
+# Check status
 Get-Service OpenCodeDiscordBot
-```
 
-**View logs:**
+# Start/Stop/Restart
+Start-Service OpenCodeDiscordBot
+Stop-Service OpenCodeDiscordBot
+Restart-Service OpenCodeDiscordBot
 
-Default log location (when installed via service script):
-
-```
-C:\Users\Ke\.local\share\opencode\log\discord-out.log
-C:\Users\Ke\.local\share\opencode\log\discord-err.log
-```
-
-View logs via PowerShell:
-
-```powershell
-# Recent output
+# View logs
 Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Tail 50
 
-# Recent errors
-Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log" -Tail 50
-
-# Watch logs in real-time
-Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Wait
-
-# Search for errors
-Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log" | Select-String "ERROR" -Context 2
-```
-
-**Change log location:**
-
-```powershell
-# Run as Administrator to change log location
-.\script\set-log-location.ps1 -LogDir "C:\custom\log\path"
-```
-
-**Windows Services GUI:**
-
-```powershell
-services.msc
-```
-
-Then find "OpenCode Discord Bot" → Right-click → Start/Stop/Restart
-
-**Command Prompt:**
-
-```cmd
-net start OpenCodeDiscordBot
-net stop OpenCodeDiscordBot
-```
-
-### Uninstall Service
-
-```powershell
-# From packages/discord directory, as Administrator
-powershell -ExecutionPolicy Bypass -File script/uninstall-service.ps1
-
-# Keep log files (optional)
-powershell -ExecutionPolicy Bypass -File script/uninstall-service.ps1 -KeepLogs
-```
-
-### Troubleshooting Service Issues
-
-**Service won't start:**
-
-1. **Check if Bun is in system PATH:**
-
-   ```powershell
-   Get-Command bun
-   ```
-
-2. **Check logs for errors:**
-
-   ```powershell
-   Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log"
-   ```
-
-3. **Test running manually first:**
-
-   ```powershell
-   bun run src/index.ts
-   ```
-
-   If this works but service doesn't, the service account may lack PATH access.
-
-4. **Check Windows Event Log:**
-   ```powershell
-   Get-WinEvent -FilterHashtable @{LogName='System'} -MaxEvents 20 | Where-Object { $_.Message -like "*OpenCodeDiscordBot*" }
-   ```
-
-**Service stops immediately:**
-
-Common causes:
-
-- Missing Discord bot token in environment
-- `opencode` not in PATH for service account
-- Port conflicts
-
-**Fix environment for service:**
-
-If the service can't find Bun or OpenCode, you may need to set the PATH explicitly:
-
-```powershell
-# Get current PATH
-$currentPath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
-
-# Add Bun and OpenCode (adjust paths as needed)
-$newPath = $currentPath + ";C:\ProgramData\chocolatey\bin;C:\Users\$env:USERNAME\.bun\bin"
-[Environment]::SetEnvironmentVariable("PATH", $newPath, "Machine")
-
-# Restart service
-Restart-Service OpenCodeDiscordBot
+# Remove service
+powershell -ExecutionPolicy Bypass -File script\uninstall-service.ps1
 ```
 
 ---
@@ -275,7 +127,7 @@ Restart-Service OpenCodeDiscordBot
 ### Session Management
 
 - `/session create [title]` - Create a new session
-- `/session list` - List your active sessions
+- `/session list` - List all your sessions from the database
 - `/session attach <id>` - Attach to an existing session
 - `/session share` - Get shareable link to current session
 - `/session unshare` - Revoke share link
@@ -308,8 +160,36 @@ Restart-Service OpenCodeDiscordBot
 ### Bot Management (Windows Service)
 
 - `/stop` - Stop the Discord bot (graceful shutdown)
-- `/restart` - Restart the Discord bot (when running as Windows Service)
-- `/log [lines]` - Show the Discord bot service log (default: 50 lines)
+- `/restart` - Restart the Discord bot (reloads code)
+- `/log [lines]` - Show the Discord bot log (default: 50 lines)
+
+---
+
+## Logging
+
+The bot handles all logging internally (no NSSM log redirection):
+
+- **Output log:** `~/.local/share/opencode/log/discord-out.log`
+- **Error log:** `~/.local\share\opencode\log\discord-err.log`
+- **Rotation:** Automatic at 10MB
+- **Log levels:**
+  - Production: info, warn, error
+  - Debug mode (`--dev`): debug, info, warn, error
+
+**View logs:**
+```powershell
+# Recent output
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Tail 50
+
+# Recent errors
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log" -Tail 50
+
+# Watch in real-time
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Wait
+
+# Search for errors
+Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log" | Select-String "ERROR" -Context 2
+```
 
 ---
 
@@ -320,7 +200,7 @@ Restart-Service OpenCodeDiscordBot
 The Discord bot runs as a standalone process that spawns OpenCode server instances for each user session.
 
 ```
-Discord Bot Process (bun run src/index.ts)
+Discord Bot Process (opencode-discord)
     │
     ├── Spawns ──► OpenCode Server #1 (localhost:xxxxx) ◄── User A's session
     │                  ├── API (for bot)
@@ -333,163 +213,21 @@ Discord Bot Process (bun run src/index.ts)
     └── Connects to AI Providers (moonshotai, anthropic, etc.)
 ```
 
-### Process Model
+### Session Persistence
 
-**When the Discord bot starts:**
+Sessions are stored in the OpenCode database:
+- **Location:** `~/.local/share/opencode/opencode.db`
+- **Access:** Via `/session list` and `/session attach <id>`
+- **Persistence:** Survives bot restarts
 
-1. Discord bot process starts (`bun run src/index.ts` or compiled binary)
-2. Waits for Discord messages
-
-**When a user sends a message:**
-
-1. Bot spawns `opencode serve --hostname=127.0.0.1 --port=0`
-2. OpenCode server picks a random available port
-3. Bot connects via SDK to `http://127.0.0.1:<port>`
-4. Session is created and stored in memory
-
-**When the Discord bot stops:**
-
-- All spawned OpenCode server processes are killed
-- PID file is cleaned up (if using scripts)
-
-### Viewing Active Processes
-
-```powershell
-# See Discord bot and OpenCode server processes
-Get-Process | Where-Object { $_.Name -like "*opencode*" -or $_.Name -like "*bun*" }
-
-# See network ports used by OpenCode servers
-Get-NetTCPConnection -OwningProcess (Get-Process opencode).Id | Select-Object LocalAddress, LocalPort
-```
-
-### Session Management
-
-Each user/channel combination gets its own session:
-
-- **Session ID** - Unique identifier for the conversation
-- **SDK Client** - OpenCode SDK instance connected to the server
-- **Server Handle** - Local OpenCode server process
-- **Model Config** - Selected provider and model
-
-Sessions are stored in memory and persist for the bot's lifetime (or until timeout).
-
-### Message Flow
-
-1. User sends message (mention bot or DM)
-2. Bot extracts text and attachments
-3. Get or create session for user/channel
-4. Send prompt to OpenCode via SDK
-5. OpenCode processes with AI provider
-6. Extract response from parts array
-7. Reply to Discord
-
-### Model Selection Priority
-
-1. **Discord command** (`/model switch`) - highest priority
-2. **Project config** (`.opencode/opencode.jsonc`)
-3. **Global config** (`~/.config/opencode/opencode.json`)
-4. **Server default** - first available provider
-
----
-
-## Web Interface
-
-### Status
-
-Each spawned OpenCode server includes a **web interface**, but with limitations:
-
-- ✅ **Running:** Web UI is active on each server
-- ✅ **API:** Discord bot uses the API endpoints
-- ❌ **Localhost Only:** Bound to `127.0.0.1` (not accessible from other devices)
-
-### Accessing the Web UI
-
-Since servers are bound to `127.0.0.1`, the web interface is only accessible from the **same machine** running the bot:
-
-```
-http://127.0.0.1:<port>/session/<session-id>
-```
-
-**Note:** Each user session has its own server on a different random port.
-
-### Making Web UI Network-Accessible (Advanced)
-
-**⚠️ Security Warning:** Exposing the web UI to your network allows anyone on the network to access sessions without authentication.
-
-To bind to all interfaces (`0.0.0.0`), edit `src/utils/session.ts`:
-
-```typescript
-// Change this line:
-;(`serve`,
-  `--hostname=127.0.0.1`,
-  `--port=${port}`
-  // To:
-  `serve`,
-  `--hostname=0.0.0.0`,
-  `--port=${port}`)
-```
-
-Then rebuild and restart the bot.
-
-### Checking Active Web Interfaces
-
-```powershell
-# List all OpenCode servers and their ports
-$opencodeProcesses = Get-Process opencode -ErrorAction SilentlyContinue
-foreach ($proc in $opencodeProcesses) {
-    $connections = Get-NetTCPConnection -OwningProcess $proc.Id -ErrorAction SilentlyContinue |
-        Where-Object { $_.State -eq "Listen" }
-    foreach ($conn in $connections) {
-        Write-Host "PID $($proc.Id): http://$($conn.LocalAddress):$($conn.LocalPort)"
-    }
-}
-```
-
----
-
-## Configuration
-
-### Global Config
-
-Location: `~/.config/opencode/opencode.json`
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "model": "moonshotai/kimi-k2.5"
-}
-```
-
-### Auth Keys
-
-Location: `~/.local/share/opencode/auth.json`
-
-```json
-{
-  "moonshotai": {
-    "type": "api",
-    "key": "sk-..."
-  }
-}
-```
-
-### Project Config
-
-Location: `.opencode/opencode.jsonc` (in project root)
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "model": "moonshotai/kimi-k2.5"
-}
-```
+The bot spawns temporary OpenCode servers to query the database when listing or attaching to sessions.
 
 ---
 
 ## Development
 
 ```bash
-# Run in development mode
+# Run in development mode (hot reload)
 bun run dev
 
 # Type check
@@ -499,315 +237,65 @@ bun run typecheck
 bun test
 ```
 
-### Building Standalone Binary
-
-Compile the bot to a standalone executable:
+### Building
 
 ```bash
-# Build for current platform only
+# Build for current platform
 bun run script/build.ts --single
 
-# Build for all platforms (linux, macos, windows)
+# Build for all platforms
 bun run script/build.ts
 ```
 
 The compiled binary will be in:
-
 ```
 dist/opencode-discord-<platform>-<arch>/bin/opencode-discord[.exe]
 ```
 
-**Note:** The compiled binary expects `opencode` to be available in your PATH. If not found, it will exit with an error.
+### Version
 
-### Testing Manually
-
-```bash
-# Start server manually
-cd packages/opencode
-bun run --conditions=browser src/index.ts serve --port 4096
-
-# Test API
-curl -X POST http://localhost:4096/session \
-  -H "Content-Type: application/json" \
-  -d '{"title": "test"}'
+The binary includes the git commit hash:
 ```
-
-### Pairing Approval
-
-When using DM policy `pairing` (default), users must be approved before they can interact with the bot in DMs. The bot will show a pairing code that the owner must approve.
-
-```bash
-# From the discord package directory
-cd packages/discord
-
-# Approve a pairing code (code is case-insensitive)
-bun run src/cli/pairing.ts pairing approve <CODE>
-
-# Example:
-bun run src/cli/pairing.ts pairing approve ABC123
+opencode-discord 1.0.0-abc1234
 ```
-
-Or if you've linked the package globally:
-
-```bash
-opencode-discord pairing approve <CODE>
-```
-
-Other pairing commands:
-
-```bash
-# List paired users and pending codes
-bun run src/cli/pairing.ts pairing list
-
-# Remove a paired user
-bun run src/cli/pairing.ts pairing remove <USER_ID>
-```
-
----
-
-## Adding a New Discord Command
-
-To add a new slash command to the Discord bot, follow these steps:
-
-### 1. Create the Command File
-
-Create a new file in `src/commands/` (e.g., `mycommand.ts`):
-
-```typescript
-import { SlashCommandBuilder, type ChatInputCommandInteraction, type CacheType } from "discord.js"
-import { createSuccessEmbed, createErrorEmbed } from "../utils/discord.js"
-
-export const myCommand = new SlashCommandBuilder()
-  .setName("mycommand")
-  .setDescription("Description of what this command does")
-  // Add options if needed
-  .addStringOption((option) =>
-    option
-      .setName("input")
-      .setDescription("Input parameter")
-      .setRequired(false),
-  )
-
-export async function handleMyCommand(interaction: ChatInputCommandInteraction<CacheType>) {
-  await interaction.deferReply()
-
-  try {
-    const input = interaction.options.getString("input")
-    
-    // Your command logic here
-    await interaction.editReply({
-      embeds: [createSuccessEmbed("Success", `You entered: ${input || "nothing"}`)],
-    })
-  } catch (error) {
-    console.error("MyCommand error:", error)
-    await interaction.editReply({
-      embeds: [createErrorEmbed("Failed to execute command")],
-    })
-  }
-}
-```
-
-### 2. Register in Command Registry
-
-Add the command to `src/commands/registry.ts`:
-
-```typescript
-// Add import at the top
-import { myCommand, handleMyCommand } from "./mycommand.js"
-
-// Add to commands array
-const commands: CommandDefinition[] = [
-  // ... existing commands
-  {
-    key: "mycommand",
-    builder: myCommand,
-    description: myCommand.description,
-    handle: handleMyCommand,
-  },
-]
-```
-
-### 3. Add Handler to Interaction Router
-
-Add the command handler to `src/handlers/interaction.ts`:
-
-```typescript
-// Add import
-import { handleMyCommand } from "../commands/mycommand.js"
-
-// Add case in switch statement
-switch (commandName) {
-  // ... existing cases
-  case "mycommand":
-    await handleMyCommand(interaction)
-    break
-  default:
-    console.log(`Unknown command: ${commandName}`)
-}
-```
-
-### 4. Add Text Command Support (Optional)
-
-If you want the command to work via text messages (e.g., `/mycommand arg`), update `src/utils/text-command.ts`:
-
-```typescript
-// Add to validCommands array
-const validCommands = ["session", "agent", "model", ..., "mycommand"]
-
-// Add case in switch
-switch (command) {
-  // ... existing cases
-  case "mycommand":
-    return await handleMyCommandText(message, subcommand, args)
-}
-
-// Add handler function
-async function handleMyCommandText(message: Message, subcommand: string, args: string[]): Promise<boolean> {
-  const input = args.join(" ")
-  await message.reply(`You entered: ${input || "nothing"}`)
-  return true
-}
-```
-
-### 5. Test the Command
-
-Run typecheck to ensure no errors:
-```bash
-cd packages/discord
-bun run typecheck
-```
-
-### 6. Restart the Bot
-
-**Important:** Discord caches slash commands. You must restart the bot for the new command to appear:
-
-```powershell
-# If running as Windows Service
-Restart-Service OpenCodeDiscordBot
-
-# If running manually
-# Stop (Ctrl+C), then:
-bun run src/index.ts
-```
-
-After restart, the bot will re-register all commands with Discord's API, and `/mycommand` will appear in the slash command list.
-
-### Troubleshooting New Commands
-
-**Command doesn't appear in Discord:**
-- Did you restart the bot? Discord caches commands on startup
-- Check logs: `Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Tail 20`
-- Look for: `[registry] getCommandBuilders returning X commands`
-
-**"Unknown command" error:**
-- Check `interaction.ts` switch statement - did you add the case?
-- Check `registry.ts` - is the command in the commands array?
-
-**Type errors:**
-- Run `bun run typecheck` to see TypeScript errors
-- Ensure you're importing from the correct paths (use `.js` extensions)
 
 ---
 
 ## Troubleshooting
 
-### Bot Already Running (PID File Exists)
+### "opencode-discord not found"
 
-**Error:** "Bot is already running with PID xxx"
-
-**Cause:** The PID file from a previous run still exists.
-
-**Fix:**
-
+Make sure the binary is in your PATH:
 ```powershell
-# Check if process actually exists
-Get-Process -Id <PID>  # If this fails, it's a stale PID file
+# Check if installed
+Get-Command opencode-discord
 
-# Remove stale PID file
-Remove-Item script/opencode-discord.pid
-
-# Or use the stop script
-powershell -ExecutionPolicy Bypass -File script/stop.ps1
+# If not found, reinstall
+tools\build-and-install-discord-bot.ps1
 ```
 
-### Orphaned OpenCode Processes
+### "/session list shows no sessions"
 
-**Issue:** OpenCode server processes left running after bot crashes.
+1. Check that opencode is installed: `Get-Command opencode`
+2. Check the logs for errors: `Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Tail 20`
+3. If running as Windows Service, ensure the service has the correct PATH to find `opencode`
 
-**Symptom:** Multiple `opencode` processes in Task Manager.
+### Service won't start
 
-**Fix:**
+1. Check Windows Event Log:
+   ```powershell
+   Get-WinEvent -FilterHashtable @{LogName='System'} -MaxEvents 20 | Where-Object { $_.Message -like "*OpenCodeDiscordBot*" }
+   ```
 
-```powershell
-# Kill all OpenCode server processes (keeps Discord bot)
-Get-Process opencode | Stop-Process -Force
+2. Test running manually:
+   ```powershell
+   opencode-discord
+   ```
 
-# Or kill everything including bot
-Get-Process | Where-Object { $_.Name -like "*opencode*" -or $_.ProcessName -eq "bun" } | Stop-Process -Force
-Remove-Item script/opencode-discord.pid -ErrorAction SilentlyContinue
-```
-
-### "'opencode' not found in PATH"
-
-**Error:** Bot fails to start because it can't find the `opencode` binary.
-
-**Cause:** The Discord bot spawns OpenCode servers as child processes.
-
-**Fix:**
-
-```powershell
-# Add opencode to your PATH (adjust path as needed)
-$env:PATH += ";C:\path\to\opencode\bin"
-
-# Or create a symlink in a directory already in PATH
-New-Item -ItemType SymbolicLink -Path "$env:LOCALAPPDATA\Microsoft\WindowsApps\opencode.exe" -Target "C:\path\to\opencode\bin\opencode.exe"
-```
-
-### Web UI Not Accessible
-
-**Issue:** Can't access the web interface from another device.
-
-**Cause:** Servers are bound to `127.0.0.1` (localhost only) for security.
-
-**Status:** This is by design. The web UI is only meant for local debugging.
-
-**Workaround:** See "Making Web UI Network-Accessible" in the Architecture section.
-
-### "ProviderModelNotFoundError" for anthropic/claude
-
-**Cause:** No model configured and no default set.
-
-**Fix:** Set default model in `.opencode/opencode.jsonc`:
-
-```json
-{ "model": "moonshotai/kimi-k2.5" }
-```
-
-### No response received
-
-**Cause:** Response format changed.
-
-**Check:** The bot extracts text from `parts` array. Verify the provider returns text parts.
-
----
-
-## File Structure
-
-```
-src/
-├── handlers/
-│   ├── message.ts      # Message handling with model passthrough
-│   └── interaction.ts  # Slash commands
-├── commands/
-│   ├── ask.ts          # /ask command
-│   ├── model.ts        # /model switch command
-│   └── ...
-├── utils/
-│   └── session.ts      # Session management, server spawning
-├── types/
-│   └── index.ts        # Type definitions
-└── index.ts            # Entry point
-```
+3. Check NSSM configuration:
+   ```powershell
+   nssm dump OpenCodeDiscordBot
+   ```
 
 ---
 

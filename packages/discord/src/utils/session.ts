@@ -18,11 +18,19 @@ export async function createOpencodeServer(options?: { port?: number; timeout?: 
     `--port=${port}`,
   ]
 
+  // Ensure opencode uses the correct user home directory
+  // This is critical when running as Windows Service (LocalSystem)
+  const spawnEnv = {
+    ...process.env,
+    USERPROFILE: process.env.USERPROFILE || require("node:os").homedir(),
+    HOMEDRIVE: process.env.HOMEDRIVE || "C:",
+    HOMEPATH: process.env.HOMEPATH || require("node:os").homedir().replace("C:", ""),
+  }
+
+  console.log(`[createOpencodeServer] Spawning opencode with USERPROFILE: ${spawnEnv.USERPROFILE}`)
+
   const proc = spawn(OPENCODE_BINARY, args, {
-    env: {
-      ...process.env,
-      // Don't override config - let server load user's global config from ~/.config/opencode
-    },
+    env: spawnEnv,
   })
 
   const url = await new Promise<string>((resolve, reject) => {

@@ -8,14 +8,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Configuration
-$NssmVersion = "2.24"
-$NssmDir = "$env:TEMP\nssm-$NssmVersion"
-$NssmExe = "$NssmDir\win64\nssm.exe"
-$LogDir = "$PSScriptRoot\..\logs"
-
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "OpenCode Discord Bot Service Uninstaller" -ForegroundColor Cyan
+Write-Host "Discord Bot Service Uninstaller" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -26,54 +20,28 @@ if (-not $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltInRole]::Adm
     exit 1
 }
 
-# Check if NSSM exists
-if (-not (Test-Path $NssmExe)) {
-    # Try to find NSSM in common locations
-    $PossiblePaths = @(
-        "$env:ProgramFiles\nssm\nssm.exe",
-        "$env:ProgramFiles(x86)\nssm\nssm.exe",
-        "$env:SYSTEMDRIVE\nssm\nssm.exe"
-    )
-    
-    foreach ($path in $PossiblePaths) {
-        if (Test-Path $path) {
-            $NssmExe = $path
-            break
-        }
-    }
-    
-    if (-not (Test-Path $NssmExe)) {
-        Write-Warning "NSSM not found. Will try sc.exe fallback."
-    }
-}
-
 # Check if service exists
 $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 if (-not $service) {
-    Write-Warning "Service '$ServiceName' not found. Nothing to uninstall."
+    Write-Warning "Service '$ServiceName' not found."
     exit 0
 }
 
-Write-Host "Found service: $($service.DisplayName)" -ForegroundColor Yellow
-Write-Host "Current status: $($service.Status)" -ForegroundColor Yellow
-Write-Host ""
+# Find NSSM
+$NssmExe = "C:\ProgramData\chocolatey\bin\nssm.exe"
+if (-not (Test-Path $NssmExe)) {
+    $NssmInPath = Get-Command nssm -ErrorAction SilentlyContinue
+    if ($NssmInPath) {
+        $NssmExe = $NssmInPath.Source
+    }
+}
 
-# Stop service if running
+# Stop service
 if ($service.Status -eq "Running") {
     Write-Host "Stopping service..." -NoNewline
     Stop-Service -Name $ServiceName -Force
     Start-Sleep -Seconds 2
-    
-    # Double-check it's stopped
-    $service = Get-Service -Name $ServiceName
-    if ($service.Status -eq "Stopped") {
-        Write-Host " OK" -ForegroundColor Green
-    } else {
-        Write-Host " WARNING" -ForegroundColor Yellow
-        Write-Host "Service did not stop gracefully. Will force remove." -ForegroundColor Yellow
-    }
-} else {
-    Write-Host "Service already stopped" -ForegroundColor Gray
+    Write-Host " OK" -ForegroundColor Green
 }
 
 # Remove service
@@ -82,40 +50,34 @@ if (Test-Path $NssmExe) {
     & $NssmExe remove $ServiceName confirm 2>&1 | Out-Null
 } else {
     # Fallback to sc.exe
-    sc.exe delete $ServiceName 2>&1 | Out-Null
+    sc.exe delete $ServiceName | Out-Null
 }
-
-Start-Sleep -Seconds 2
+Write-Host " OK" -ForegroundColor Green
 
 # Verify removal
-$service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-if (-not $service) {
-    Write-Host " OK" -ForegroundColor Green
-} else {
-    Write-Host " FAILED" -ForegroundColor Red
-    Write-Error "Could not remove service. You may need to remove it manually using 'sc.exe delete $ServiceName'"
+$verifyService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+if ($verifyService) {
+    Write-Error "Failed to remove service. It may still exist."
     exit 1
 }
 
-# Clean up logs
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "Service removed successfully!" -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host ""
+
 if (-not $KeepLogs) {
-    if (Test-Path $LogDir) {
-        Write-Host "Removing log files..." -NoNewline
-        Remove-Item -Path "$LogDir\service-*.log" -Force -ErrorAction SilentlyContinue
+    $LogDir = "$env:USERPROFILE\.local\share\opencode\log"
+    $response = Read-Host "Delete log files at $LogDir? (y/N)"
+    if ($response -eq "y" -or $response -eq "Y") {
+        Write-Host "Deleting log files..." -NoNewline
+        Remove-Item -Path "$LogDir\discord-*.log" -ErrorAction SilentlyContinue
         Write-Host " OK" -ForegroundColor Green
     }
 }
 
 Write-Host ""
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "Service uninstalled successfully!" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
-Write-Host ""
-
-if ($KeepLogs) {
-    Write-Host "Log files preserved at: $LogDir" -ForegroundColor Gray
-} else {
-    Write-Host "Log files cleaned up" -ForegroundColor Gray
-}
-
+Write-Host "To reinstall:" -ForegroundColor Yellow
+Write-Host "  .\script\install-service.ps1" -ForegroundColor Gray
 Write-Host ""

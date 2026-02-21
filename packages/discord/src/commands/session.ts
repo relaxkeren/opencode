@@ -106,13 +106,27 @@ export async function handleSessionCommand(interaction: ChatInputCommandInteract
         let tempServer: { client: any; server: { close: () => void } } | null = null
         
         try {
+          console.log("[session list] Creating temporary opencode server...")
           tempServer = await createOpencodeServer({ port: 0, timeout: 10000 })
+          console.log("[session list] Server created, querying sessions...")
+          
           const result = await tempServer.client.session.list({
             roots: true,
             limit: 50,
           })
+          
+          console.log("[session list] Result:", JSON.stringify({ error: result.error, dataLength: result.data?.length }))
 
-          if (result.error || !result.data || result.data.length === 0) {
+          if (result.error) {
+            console.error("[session list] Error from opencode:", result.error)
+            await interaction.editReply({
+              embeds: [createErrorEmbed(`Failed to list sessions: ${result.error}`)],
+            })
+            return
+          }
+          
+          if (!result.data || result.data.length === 0) {
+            console.log("[session list] No sessions found in database")
             await interaction.editReply({
               embeds: [createInfoEmbed("No Sessions", "No sessions found. Create one with `/session create`")],
             })
@@ -159,9 +173,9 @@ export async function handleSessionCommand(interaction: ChatInputCommandInteract
           
           await interaction.editReply({ embeds: [embed] })
         } catch (error) {
-          console.error("Failed to list sessions:", error)
+          console.error("[session list] Failed to list sessions:", error)
           await interaction.editReply({
-            embeds: [createErrorEmbed("Failed to list sessions. Is opencode installed and in PATH?")],
+            embeds: [createErrorEmbed(`Failed to list sessions: ${error instanceof Error ? error.message : String(error)}`)],
           })
         } finally {
           tempServer?.server.close()
