@@ -77,8 +77,8 @@ if (-not (Test-Path $LogDir)) {
     Write-Host " OK" -ForegroundColor Green
 }
 
-# NSSM startup type: 2 = auto, 3 = manual, 4 = disabled
-$StartMode = if ($AutoStart) { "2" } else { "3" }
+# NSSM startup type: SERVICE_AUTO_START = auto, SERVICE_DEMAND_START = manual
+$StartMode = if ($AutoStart) { "SERVICE_AUTO_START" } else { "SERVICE_DEMAND_START" }
 
 Write-Host "Configuring service..." -ForegroundColor Cyan
 Write-Host "  Service Name: $ServiceName" -ForegroundColor Gray
@@ -103,9 +103,8 @@ Write-Host "Configuring service..." -NoNewline
 & $NssmExe set $ServiceName AppDirectory $env:USERPROFILE 2>&1 | Out-Null
 & $NssmExe set $ServiceName Start $StartMode 2>&1 | Out-Null
 
-# NO log redirection - binary handles logging internally
-& $NssmExe set $ServiceName AppStdout "" 2>&1 | Out-Null
-& $NssmExe set $ServiceName AppStderr "" 2>&1 | Out-Null
+# Note: NO log redirection - binary handles logging internally
+# NSSM stdout/stderr not set = no redirection
 
 # Set environment variables to ensure correct user home directory
 $envString = "USERPROFILE=$env:USERPROFILE;HOMEDRIVE=C:;HOMEPATH=\Users\$($env:USERNAME)"

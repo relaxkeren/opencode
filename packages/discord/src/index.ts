@@ -106,7 +106,7 @@ async function main() {
   // Check if enabled
   const cfg = configManager.get()
   if (!cfg.enabled) {
-    logger.info("Discord plugin is disabled")
+    logger.info("Discord plugin is disabled and shutdown")
     process.exit(0)
   }
 
