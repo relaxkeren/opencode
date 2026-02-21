@@ -130,6 +130,79 @@ Stops the Discord bot gracefully from Discord chat.
 
 ---
 
+## Windows Service Installation
+
+For production deployments, install the Discord bot as a Windows Service to run automatically on startup.
+
+### Prerequisites
+
+- Windows 10/11 or Windows Server
+- PowerShell running as Administrator
+- Bun installed and in PATH
+- OpenCode installed and in PATH
+
+### Install Service
+
+```powershell
+cd packages/discord
+.\script\install-service.ps1
+```
+
+**Options:**
+```powershell
+# Custom service name
+.\script\install-service.ps1 -ServiceName "MyDiscordBot" -DisplayName "My Discord Bot"
+
+# Manual start (not auto-start)
+.\script\install-service.ps1 -AutoStart:$false
+
+# Reinstall (force overwrite existing)
+.\script\install-service.ps1 -Force
+```
+
+### Service Features
+
+- **Auto-restart**: Service restarts automatically if bot crashes
+- **Log rotation**: Logs rotate at 10MB (keeps history)
+- **Graceful shutdown**: Handles Windows shutdown/restart signals
+- **No console window**: Runs silently in background
+
+### Manage Service
+
+```powershell
+# Check status
+Get-Service OpenCodeDiscordBot
+
+# Start/Stop/Restart
+Start-Service OpenCodeDiscordBot
+Stop-Service OpenCodeDiscordBot
+Restart-Service OpenCodeDiscordBot
+
+# View logs
+Get-Content .\logs\service-out.log -Tail 50
+Get-Content .\logs\service-err.log -Tail 50
+
+# Windows GUI
+services.msc
+```
+
+### Uninstall Service
+
+```powershell
+.\script\uninstall-service.ps1
+
+# Keep log files
+.\script\uninstall-service.ps1 -KeepLogs
+```
+
+### File Locations
+
+- **Service binary**: Uses `bun run src/index.ts` from package directory
+- **Log files**: `packages/discord/logs/service-{out,err}.log`
+- **Service config**: Stored in Windows Registry (via NSSM)
+
+---
+
 ## Future Enhancements
 
 - Add search/filter to `/session list` (by title, date range)

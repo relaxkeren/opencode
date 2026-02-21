@@ -80,6 +80,152 @@ This will:
 
 ---
 
+## Windows Service Installation (Production)
+
+For production deployments, install the Discord bot as a Windows Service to run automatically on startup.
+
+### Prerequisites
+
+- Windows 10/11 or Windows Server
+- PowerShell running as Administrator
+- Bun installed and in PATH
+- OpenCode installed and in PATH
+- NSSM (will be auto-downloaded or install via `choco install nssm`)
+
+### Install Service
+
+```powershell
+# From packages/discord directory, as Administrator
+powershell -ExecutionPolicy Bypass -File script/install-service.ps1
+```
+
+**Options:**
+```powershell
+# Custom service name
+powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -ServiceName "MyDiscordBot" -DisplayName "My Discord Bot"
+
+# Manual start (not auto-start)
+powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -AutoStart:$false
+
+# Reinstall (force overwrite existing)
+powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -Force
+```
+
+### Service Features
+
+- **Auto-start**: Service starts automatically on Windows boot
+- **Auto-restart**: Service restarts automatically if bot crashes
+- **Log rotation**: Logs rotate at 10MB (keeps history)
+- **Graceful shutdown**: Handles Windows shutdown/restart signals
+- **No console window**: Runs silently in background
+- **Failure recovery**: Restarts on first failure after 3 seconds, second after 6 seconds
+
+### Manage Service
+
+**Start the service:**
+```powershell
+Start-Service OpenCodeDiscordBot
+```
+
+**Stop the service:**
+```powershell
+Stop-Service OpenCodeDiscordBot
+```
+
+**Restart the service:**
+```powershell
+Restart-Service OpenCodeDiscordBot
+```
+
+**Check status:**
+```powershell
+Get-Service OpenCodeDiscordBot
+```
+
+**View logs:**
+```powershell
+# Recent output
+Get-Content .\logs\service-out.log -Tail 50
+
+# Recent errors
+Get-Content .\logs\service-err.log -Tail 50
+
+# Watch logs in real-time
+Get-Content .\logs\service-out.log -Wait
+```
+
+**Windows Services GUI:**
+```powershell
+services.msc
+```
+Then find "OpenCode Discord Bot" → Right-click → Start/Stop/Restart
+
+**Command Prompt:**
+```cmd
+net start OpenCodeDiscordBot
+net stop OpenCodeDiscordBot
+```
+
+### Uninstall Service
+
+```powershell
+# From packages/discord directory, as Administrator
+powershell -ExecutionPolicy Bypass -File script/uninstall-service.ps1
+
+# Keep log files (optional)
+powershell -ExecutionPolicy Bypass -File script/uninstall-service.ps1 -KeepLogs
+```
+
+### Troubleshooting Service Issues
+
+**Service won't start:**
+
+1. **Check if Bun is in system PATH:**
+   ```powershell
+   Get-Command bun
+   ```
+
+2. **Check logs for errors:**
+   ```powershell
+   Get-Content .\logs\service-err.log
+   ```
+
+3. **Test running manually first:**
+   ```powershell
+   bun run src/index.ts
+   ```
+   If this works but service doesn't, the service account may lack PATH access.
+
+4. **Check Windows Event Log:**
+   ```powershell
+   Get-WinEvent -FilterHashtable @{LogName='System'} -MaxEvents 20 | Where-Object { $_.Message -like "*OpenCodeDiscordBot*" }
+   ```
+
+**Service stops immediately:**
+
+Common causes:
+- Missing Discord bot token in environment
+- `opencode` not in PATH for service account
+- Port conflicts
+
+**Fix environment for service:**
+
+If the service can't find Bun or OpenCode, you may need to set the PATH explicitly:
+
+```powershell
+# Get current PATH
+$currentPath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+
+# Add Bun and OpenCode (adjust paths as needed)
+$newPath = $currentPath + ";C:\ProgramData\chocolatey\bin;C:\Users\$env:USERNAME\.bun\bin"
+[Environment]::SetEnvironmentVariable("PATH", $newPath, "Machine")
+
+# Restart service
+Restart-Service OpenCodeDiscordBot
+```
+
+---
+
 ## Commands
 
 ### General
