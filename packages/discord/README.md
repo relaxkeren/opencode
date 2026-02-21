@@ -52,29 +52,34 @@ bun run dev
 For long-running deployments, use the provided PowerShell scripts that track the process ID:
 
 **Start the bot:**
+
 ```powershell
 # From packages/discord directory
 powershell -ExecutionPolicy Bypass -File script/start.ps1
 ```
 
 This will:
+
 - Check if the bot is already running (via PID file)
 - Start the bot with `bun run src/index.ts`
 - Save the PID to `script/opencode-discord.pid`
 - Report the process ID
 
 **Stop the bot:**
+
 ```powershell
 # From packages/discord directory
 powershell -ExecutionPolicy Bypass -File script/stop.ps1
 ```
 
 This will:
+
 - Read the PID from the PID file
 - Kill the process
 - Clean up the PID file
 
 **Requirements for scripts:**
+
 - `bun` must be in your PATH
 - `opencode` must be in your PATH (the bot spawns OpenCode servers)
 
@@ -100,6 +105,7 @@ powershell -ExecutionPolicy Bypass -File script/install-service.ps1
 ```
 
 **Options:**
+
 ```powershell
 # Custom service name
 powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -ServiceName "MyDiscordBot" -DisplayName "My Discord Bot"
@@ -123,21 +129,25 @@ powershell -ExecutionPolicy Bypass -File script/install-service.ps1 -Force
 ### Manage Service
 
 **Start the service:**
+
 ```powershell
 Start-Service OpenCodeDiscordBot
 ```
 
 **Stop the service:**
+
 ```powershell
 Stop-Service OpenCodeDiscordBot
 ```
 
 **Restart the service:**
+
 ```powershell
 Restart-Service OpenCodeDiscordBot
 ```
 
 **Check status:**
+
 ```powershell
 Get-Service OpenCodeDiscordBot
 ```
@@ -145,12 +155,14 @@ Get-Service OpenCodeDiscordBot
 **View logs:**
 
 Default log location (when installed via service script):
+
 ```
 C:\Users\Ke\.local\share\opencode\log\discord-out.log
 C:\Users\Ke\.local\share\opencode\log\discord-err.log
 ```
 
 View logs via PowerShell:
+
 ```powershell
 # Recent output
 Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Tail 50
@@ -166,18 +178,22 @@ Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log" | Selec
 ```
 
 **Change log location:**
+
 ```powershell
 # Run as Administrator to change log location
 .\script\set-log-location.ps1 -LogDir "C:\custom\log\path"
 ```
 
 **Windows Services GUI:**
+
 ```powershell
 services.msc
 ```
+
 Then find "OpenCode Discord Bot" → Right-click → Start/Stop/Restart
 
 **Command Prompt:**
+
 ```cmd
 net start OpenCodeDiscordBot
 net stop OpenCodeDiscordBot
@@ -198,19 +214,23 @@ powershell -ExecutionPolicy Bypass -File script/uninstall-service.ps1 -KeepLogs
 **Service won't start:**
 
 1. **Check if Bun is in system PATH:**
+
    ```powershell
    Get-Command bun
    ```
 
 2. **Check logs for errors:**
+
    ```powershell
    Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-err.log"
    ```
 
 3. **Test running manually first:**
+
    ```powershell
    bun run src/index.ts
    ```
+
    If this works but service doesn't, the service account may lack PATH access.
 
 4. **Check Windows Event Log:**
@@ -221,6 +241,7 @@ powershell -ExecutionPolicy Bypass -File script/uninstall-service.ps1 -KeepLogs
 **Service stops immediately:**
 
 Common causes:
+
 - Missing Discord bot token in environment
 - `opencode` not in PATH for service account
 - Port conflicts
@@ -288,6 +309,7 @@ Restart-Service OpenCodeDiscordBot
 
 - `/stop` - Stop the Discord bot (graceful shutdown)
 - `/restart` - Restart the Discord bot (when running as Windows Service)
+- `/log [lines]` - Show the Discord bot service log (default: 50 lines)
 
 ---
 
@@ -314,16 +336,19 @@ Discord Bot Process (bun run src/index.ts)
 ### Process Model
 
 **When the Discord bot starts:**
+
 1. Discord bot process starts (`bun run src/index.ts` or compiled binary)
 2. Waits for Discord messages
 
 **When a user sends a message:**
+
 1. Bot spawns `opencode serve --hostname=127.0.0.1 --port=0`
 2. OpenCode server picks a random available port
 3. Bot connects via SDK to `http://127.0.0.1:<port>`
 4. Session is created and stored in memory
 
 **When the Discord bot stops:**
+
 - All spawned OpenCode server processes are killed
 - PID file is cleaned up (if using scripts)
 
@@ -395,10 +420,13 @@ To bind to all interfaces (`0.0.0.0`), edit `src/utils/session.ts`:
 
 ```typescript
 // Change this line:
-`serve`, `--hostname=127.0.0.1`, `--port=${port}`
-
-// To:
-`serve`, `--hostname=0.0.0.0`, `--port=${port}`
+;(`serve`,
+  `--hostname=127.0.0.1`,
+  `--port=${port}`
+  // To:
+  `serve`,
+  `--hostname=0.0.0.0`,
+  `--port=${port}`)
 ```
 
 Then rebuild and restart the bot.
@@ -409,7 +437,7 @@ Then rebuild and restart the bot.
 # List all OpenCode servers and their ports
 $opencodeProcesses = Get-Process opencode -ErrorAction SilentlyContinue
 foreach ($proc in $opencodeProcesses) {
-    $connections = Get-NetTCPConnection -OwningProcess $proc.Id -ErrorAction SilentlyContinue | 
+    $connections = Get-NetTCPConnection -OwningProcess $proc.Id -ErrorAction SilentlyContinue |
         Where-Object { $_.State -eq "Listen" }
     foreach ($conn in $connections) {
         Write-Host "PID $($proc.Id): http://$($conn.LocalAddress):$($conn.LocalPort)"
@@ -484,6 +512,7 @@ bun run script/build.ts
 ```
 
 The compiled binary will be in:
+
 ```
 dist/opencode-discord-<platform>-<arch>/bin/opencode-discord[.exe]
 ```
@@ -536,6 +565,150 @@ bun run src/cli/pairing.ts pairing remove <USER_ID>
 
 ---
 
+## Adding a New Discord Command
+
+To add a new slash command to the Discord bot, follow these steps:
+
+### 1. Create the Command File
+
+Create a new file in `src/commands/` (e.g., `mycommand.ts`):
+
+```typescript
+import { SlashCommandBuilder, type ChatInputCommandInteraction, type CacheType } from "discord.js"
+import { createSuccessEmbed, createErrorEmbed } from "../utils/discord.js"
+
+export const myCommand = new SlashCommandBuilder()
+  .setName("mycommand")
+  .setDescription("Description of what this command does")
+  // Add options if needed
+  .addStringOption((option) =>
+    option
+      .setName("input")
+      .setDescription("Input parameter")
+      .setRequired(false),
+  )
+
+export async function handleMyCommand(interaction: ChatInputCommandInteraction<CacheType>) {
+  await interaction.deferReply()
+
+  try {
+    const input = interaction.options.getString("input")
+    
+    // Your command logic here
+    await interaction.editReply({
+      embeds: [createSuccessEmbed("Success", `You entered: ${input || "nothing"}`)],
+    })
+  } catch (error) {
+    console.error("MyCommand error:", error)
+    await interaction.editReply({
+      embeds: [createErrorEmbed("Failed to execute command")],
+    })
+  }
+}
+```
+
+### 2. Register in Command Registry
+
+Add the command to `src/commands/registry.ts`:
+
+```typescript
+// Add import at the top
+import { myCommand, handleMyCommand } from "./mycommand.js"
+
+// Add to commands array
+const commands: CommandDefinition[] = [
+  // ... existing commands
+  {
+    key: "mycommand",
+    builder: myCommand,
+    description: myCommand.description,
+    handle: handleMyCommand,
+  },
+]
+```
+
+### 3. Add Handler to Interaction Router
+
+Add the command handler to `src/handlers/interaction.ts`:
+
+```typescript
+// Add import
+import { handleMyCommand } from "../commands/mycommand.js"
+
+// Add case in switch statement
+switch (commandName) {
+  // ... existing cases
+  case "mycommand":
+    await handleMyCommand(interaction)
+    break
+  default:
+    console.log(`Unknown command: ${commandName}`)
+}
+```
+
+### 4. Add Text Command Support (Optional)
+
+If you want the command to work via text messages (e.g., `/mycommand arg`), update `src/utils/text-command.ts`:
+
+```typescript
+// Add to validCommands array
+const validCommands = ["session", "agent", "model", ..., "mycommand"]
+
+// Add case in switch
+switch (command) {
+  // ... existing cases
+  case "mycommand":
+    return await handleMyCommandText(message, subcommand, args)
+}
+
+// Add handler function
+async function handleMyCommandText(message: Message, subcommand: string, args: string[]): Promise<boolean> {
+  const input = args.join(" ")
+  await message.reply(`You entered: ${input || "nothing"}`)
+  return true
+}
+```
+
+### 5. Test the Command
+
+Run typecheck to ensure no errors:
+```bash
+cd packages/discord
+bun run typecheck
+```
+
+### 6. Restart the Bot
+
+**Important:** Discord caches slash commands. You must restart the bot for the new command to appear:
+
+```powershell
+# If running as Windows Service
+Restart-Service OpenCodeDiscordBot
+
+# If running manually
+# Stop (Ctrl+C), then:
+bun run src/index.ts
+```
+
+After restart, the bot will re-register all commands with Discord's API, and `/mycommand` will appear in the slash command list.
+
+### Troubleshooting New Commands
+
+**Command doesn't appear in Discord:**
+- Did you restart the bot? Discord caches commands on startup
+- Check logs: `Get-Content "$env:USERPROFILE\.local\share\opencode\log\discord-out.log" -Tail 20`
+- Look for: `[registry] getCommandBuilders returning X commands`
+
+**"Unknown command" error:**
+- Check `interaction.ts` switch statement - did you add the case?
+- Check `registry.ts` - is the command in the commands array?
+
+**Type errors:**
+- Run `bun run typecheck` to see TypeScript errors
+- Ensure you're importing from the correct paths (use `.js` extensions)
+
+---
+
 ## Troubleshooting
 
 ### Bot Already Running (PID File Exists)
@@ -545,6 +718,7 @@ bun run src/cli/pairing.ts pairing remove <USER_ID>
 **Cause:** The PID file from a previous run still exists.
 
 **Fix:**
+
 ```powershell
 # Check if process actually exists
 Get-Process -Id <PID>  # If this fails, it's a stale PID file
@@ -563,6 +737,7 @@ powershell -ExecutionPolicy Bypass -File script/stop.ps1
 **Symptom:** Multiple `opencode` processes in Task Manager.
 
 **Fix:**
+
 ```powershell
 # Kill all OpenCode server processes (keeps Discord bot)
 Get-Process opencode | Stop-Process -Force
@@ -579,6 +754,7 @@ Remove-Item script/opencode-discord.pid -ErrorAction SilentlyContinue
 **Cause:** The Discord bot spawns OpenCode servers as child processes.
 
 **Fix:**
+
 ```powershell
 # Add opencode to your PATH (adjust path as needed)
 $env:PATH += ";C:\path\to\opencode\bin"

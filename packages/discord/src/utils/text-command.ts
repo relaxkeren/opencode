@@ -1,6 +1,9 @@
 import type { Message } from "discord.js"
 import type { User, TextChannel, ThreadChannel, Channel } from "discord.js"
 import { spawn } from "node:child_process"
+import * as fs from "node:fs"
+import * as path from "node:path"
+import * as os from "node:os"
 import { getSessionKey, getDMSessionKey } from "../utils/discord.js"
 import {
   listSessions,
@@ -31,7 +34,19 @@ export function parseTextCommand(content: string): ParsedCommand | null {
 
   console.log("[parseTextCommand] command:", command, "subcommand:", subcommand, "args:", args)
 
-  const validCommands = ["session", "agent", "model", "mcp", "status", "help", "ask", "connect", "stop", "restart"]
+  const validCommands = [
+    "session",
+    "agent",
+    "model",
+    "mcp",
+    "status",
+    "help",
+    "ask",
+    "connect",
+    "stop",
+    "restart",
+    "log",
+  ]
 
   if (!validCommands.includes(command)) {
     console.log("[parseTextCommand] Command not in valid list")
@@ -85,6 +100,8 @@ export async function handleTextCommand(message: Message, content: string): Prom
         return await handleStopTextCommand(message)
       case "restart":
         return await handleRestartTextCommand(message)
+      case "log":
+        return await handleLogTextCommand(message, args)
       default:
         return false
     }
@@ -1000,7 +1017,7 @@ async function handleStopTextCommand(message: Message): Promise<boolean> {
 
 async function handleRestartTextCommand(message: Message): Promise<boolean> {
   const serviceName = "OpenCodeDiscordBot"
-  
+
   await message.reply({
     embeds: [createSuccessEmbed("🔄 Restarting Bot", "The bot is restarting. This may take a few seconds...")],
   })
@@ -1010,22 +1027,65 @@ async function handleRestartTextCommand(message: Message): Promise<boolean> {
     Start-Sleep -Seconds 2
     Restart-Service -Name "${serviceName}" -Force
   `
-  
+
   console.log("[restart] Spawning service restart process from text command...")
-  
+
   const child = spawn("powershell.exe", ["-Command", restartScript], {
     detached: true,
     stdio: "ignore",
     windowsHide: true,
   })
-  
+
   child.unref()
-  
+
   // Exit the bot process
   setTimeout(() => {
     console.log("[restart] Exiting bot process for restart...")
     process.exit(0)
   }, 1000)
+
+  return true
+}
+
+async function handleLogTextCommand(message: Message, args: string[]): Promise<boolean> {
+  const lines = args[0] ? parseInt(args[0], 10) : 50
+  const logPath = path.join(os.homedir(), ".local", "share", "opencode", "log", "discord-out.log")
+
+  if (!fs.existsSync(logPath)) {
+    await message.reply({
+      embeds: [createErrorEmbed("Log file not found. Make sure the bot is running as a Windows Service.")],
+    })
+    return true
+  }
+
+  try {
+    const content = fs.readFileSync(logPath, "utf-8")
+    const logLines = content.split("\n")
+    const lastLines = logLines.slice(-lines).join("\n")
+
+    if (lastLines.length > 1900) {
+      const buffer = Buffer.from(lastLines, "utf-8")
+      await message.reply({
+        content: `📜 Log (last ${lines} lines):`,
+        files: [
+          {
+            attachment: buffer,
+            name: "discord-out.log",
+          },
+        ],
+      })
+    } else {
+      await message.reply({
+        embeds: [createInfoEmbed(`📜 Bot Log (last ${lines} lines)`)],
+        content: `\`\`\`\n${lastLines}\n\`\`\``,
+      })
+    }
+  } catch (error) {
+    console.error("[log] ❌ Failed to read log file:", error)
+    await message.reply({
+      embeds: [createErrorEmbed("Failed to read log file")],
+    })
+  }
 
   return true
 }
