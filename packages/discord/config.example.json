@@ -1,0 +1,17 @@
+{
+  "$schema": "./discord-bot.schema.json",
+  "enabled": true,
+  "token": "YOUR_DISCORD_BOT_TOKEN_HERE",
+  "dm": {
+    "allowFrom": [],
+    "requirePairing": true
+  },
+  "guilds": {},
+  "groupPolicy": "allowlist",
+  "commands": {
+    "native": "auto"
+  },
+  "mediaMaxMb": 8,
+  "historyLimit": 100,
+  "replyToMode": "off"
+}

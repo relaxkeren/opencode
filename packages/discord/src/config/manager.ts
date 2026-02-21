@@ -4,14 +4,15 @@ import { dirname } from "path"
 import { homedir } from "os"
 import { DiscordConfig, DiscordConfigSchema, ResolvedDiscordAccount } from "../types/index.js"
 
-const CONFIG_FILE = "opencode.discord.json"
+const CONFIG_FILE = "discord-bot.json"
 
 export class ConfigManager {
   private configPath: string
   private config: DiscordConfig | null = null
 
   constructor(stateDir?: string) {
-    const baseDir = stateDir || process.env.OPENCODE_STATE_DIR || `${homedir()}/.opencode`
+    // Use XDG config directory: ~/.config/opencode/discord-bot.json
+    const baseDir = stateDir || process.env.OPENCODE_DISCORD_CONFIG_DIR || `${homedir()}/.config/opencode`
     this.configPath = `${baseDir}/${CONFIG_FILE}`
   }
 
@@ -32,7 +33,11 @@ export class ConfigManager {
       return this.config
     }
 
-    const content = await readFile(this.configPath, "utf-8")
+    let content = await readFile(this.configPath, "utf-8")
+    // Strip BOM if present
+    if (content.charCodeAt(0) === 0xFEFF) {
+      content = content.substring(1)
+    }
     const parsed = JSON.parse(content)
     this.config = DiscordConfigSchema.parse(parsed)
     return this.config

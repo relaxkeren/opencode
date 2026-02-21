@@ -31,18 +31,32 @@ Official Discord bot for [opencode](https://github.com/opencode-ai/opencode) - i
 
 ### 3. Configure
 
-```bash
-# Clone the repository
-git clone https://github.com/opencode-ai/opencode.git
-cd opencode/packages/discord
+The Discord bot reads configuration from `~/.config/opencode/discord-bot.json`.
 
-# Install dependencies
-bun install
-
-# Configure environment
-cp .env.example .env
-# Edit .env and add your bot token
+**Option A: Use the setup script (recommended)**
+```powershell
+cd packages/discord
+powershell -ExecutionPolicy Bypass -File script\setup-config.ps1
 ```
+
+**Option B: Manual configuration**
+```powershell
+# Create config directory
+mkdir -Force "$env:USERPROFILE\.config\opencode"
+
+# Copy example config
+cp config.example.json "$env:USERPROFILE\.config\opencode\discord-bot.json"
+
+# Edit the config file and add your bot token
+notepad "$env:USERPROFILE\.config\opencode\discord-bot.json"
+```
+
+**Get your Discord Bot Token:**
+1. Go to https://discord.com/developers/applications
+2. Create a new application
+3. Go to "Bot" section
+4. Click "Reset Token" and copy it
+5. Paste into the config file
 
 ---
 

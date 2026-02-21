@@ -33,6 +33,20 @@ if (-not $binary) {
 }
 Write-Host " OK" -ForegroundColor Green
 Write-Host "  Location: $($binary.Source)" -ForegroundColor Gray
+Write-Host ""
+
+# Check for config file
+$ConfigFile = "$env:USERPROFILE\.config\opencode\discord-bot.json"
+if (-not (Test-Path $ConfigFile)) {
+    Write-Warning "Configuration file not found: $ConfigFile"
+    Write-Host "Please run setup first:" -ForegroundColor Yellow
+    Write-Host "  .\script\setup-config.ps1" -ForegroundColor Gray
+    Write-Host ""
+    $continue = Read-Host "Continue anyway? (y/N)"
+    if ($continue -ne "y" -and $continue -ne "Y") {
+        exit 1
+    }
+}
 
 # Check for NSSM
 $NssmExe = "C:\ProgramData\chocolatey\bin\nssm.exe"

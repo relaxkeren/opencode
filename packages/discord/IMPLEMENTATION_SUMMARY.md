@@ -32,6 +32,8 @@ All 6 phases of the refactor have been completed successfully.
 - Updated: `src/utils/session.ts`
   - Environment variables for Windows Service
   - Debug logging when spawning opencode
+- Updated: `src/config/manager.ts`
+  - Changed config location to `~/.config/opencode/discord-bot.json`
 
 ### Phase 4: Service Scripts ✓
 - Created: `script/install-service.ps1`
@@ -68,7 +70,30 @@ packages/discord/
 ├── script/
 │   ├── build.ts                    # Builds executables with version
 │   ├── install-service.ps1         # NEW - Install Windows Service
-│   └── uninstall-service.ps1       # NEW - Remove Windows Service
+│   ├── uninstall-service.ps1       # NEW - Remove Windows Service
+│   └── setup-config.ps1            # NEW - Setup configuration
+├── config.example.json             # NEW - Example configuration
+├── src/
+│   ├── index.ts                    # Updated - version, logging, --dev flag
+│   ├── config/manager.ts           # Updated - config location
+│   ├── utils/session.ts            # Updated - env vars, debug logging
+│   └── ... (other files unchanged)
+├── README.md                       # Updated - new instructions
+├── persistence.md                  # Updated - architecture docs
+└── REFACTOR_PLAN.md                # This implementation plan
+
+tools/
+└── build-and-install-discord-bot.ps1  # NEW - Build & install binary
+
+~/.config/opencode/
+└── discord-bot.json                # Configuration file (created by setup)
+
+~/.local/bin/
+└── opencode-discord[.exe]          # Installed binary
+
+~/.local/share/opencode/log/
+├── discord-out.log                 # Binary writes logs here
+└── discord-err.log                 # Error log
 ├── src/
 │   ├── index.ts                    # Updated - version, logging, --dev flag
 │   ├── utils/
