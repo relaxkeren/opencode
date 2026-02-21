@@ -1,144 +1,123 @@
 # Discord Session Persistence
 
-Persist Discord sessions across bot restarts.
+Enable users to access and continue previous opencode sessions from Discord across bot restarts.
 
 ---
 
 ## Problem
 
-Sessions are stored only in memory (`Map<string, SessionData>`) and lost on every bot restart. The help text incorrectly claims persistence exists.
+The Discord bot's `/session list` command only shows sessions created during the current bot runtime (stored in-memory). Sessions created in previous bot restarts are not visible, even though they exist in the opencode SQLite database.
 
 ---
 
-## Goals
+## Solution
 
-- Persist session metadata to disk
-- Automatically re-attach to existing opencode sessions on startup
-- Clean up stale sessions periodically
-- Maintain backward compatibility
+**Simplified Approach: No Channel Mapping Persistence**
+
+Instead of persisting Discord channel-to-session mappings, we query the opencode database directly for all sessions. Users can then attach to any session by ID.
+
+### User Flow
+
+1. **User runs `/session list`** → Bot queries opencode database and shows ALL sessions
+2. **User runs `/session attach <session_id>`** → Bot spawns new opencode server attached to that session
+3. **User continues conversation** → Messages go to the attached session
 
 ---
 
-## Design
+## Implementation
 
-### Data Storage
+### 1. Enhanced `/session list` Command
 
-Store session mappings in JSON at `~/.config/opencode/discord-sessions.json`:
+Query all sessions from the opencode database instead of just in-memory sessions:
 
-```json
-{
-  "version": 1,
-  "sessions": {
-    "discord:guild:channel:user": {
-      "sessionId": "abc123",
-      "channelId": "123456",
-      "userId": "789",
-      "lastActivity": "2026-02-21T12:00:00Z"
+```typescript
+// Spawn temporary opencode server to query session list
+const tempServer = await createOpencodeServer({ port: 0 })
+const result = await tempServer.client.session.list({ limit: 50 })
+// Show session ID, title, last updated time
+// Close temp server after query
+```
+
+### 2. Verified `/session attach <id>` Command
+
+Already implemented — attaches to existing session by ID:
+
+```typescript
+const session = await getOrCreateSession(message, sessionId)
+```
+
+### 3. Session Lifecycle
+
+- **Discord bot restart**: All in-memory sessions are lost (expected)
+- **Opencode sessions**: Persist in SQLite database at `~/.config/opencode/opencode.db`
+- **User reconnection**: Use `/session attach` to reconnect to any previous session
+
+---
+
+## Changes Required
+
+### `src/commands/session.ts`
+
+Modify `case "list":` handler:
+
+```typescript
+case "list": {
+  // Create temporary opencode server to query all sessions
+  const tempServer = await createOpencodeServer({ port: 0 })
+  
+  try {
+    const result = await tempServer.client.session.list({ 
+      limit: 50,
+      roots: true  // Only root sessions (not forks)
+    })
+    
+    if (result.error || !result.data || result.data.length === 0) {
+      await interaction.editReply({
+        embeds: [createInfoEmbed("No Sessions", "No sessions found. Create one with `/session create`")],
+      })
+      return
     }
+    
+    const sessionList = result.data
+      .map((s) => `• \`${s.id}\` - ${s.title} (Updated: <t:${Math.floor(s.time.updated / 1000)}:R>)`)
+      .join("\n")
+    
+    await interaction.editReply({
+      embeds: [createInfoEmbed("All Sessions", sessionList + "\n\nUse `/session attach <id>` to continue a session.")],
+    })
+  } finally {
+    tempServer.server.close()
   }
+  break
 }
 ```
 
-### Key Components
+### `src/utils/session.ts`
 
-**1. Persistence Store (`src/persistence/store.ts`)**
+Ensure `createOpencodeServer()` supports ephemeral servers for querying:
 
-- Load/save session mappings
-- Atomic writes (write to temp file, then rename)
-- Handle file corruption gracefully
-
-**2. Modified Session Manager (`src/utils/session.ts`)**
-
-- Load persisted sessions on startup
-- When creating session, check if sessionId exists in persistence
-- Start opencode server with `--session <id>` flag to attach
-- Update lastActivity on every message
-
-**3. Session Recovery (`src/persistence/recovery.ts`)**
-
-- On bot startup: iterate persisted sessions
-- Attempt to connect to each opencode session
-- Remove entries for dead sessions
-- Re-populate in-memory Map with valid sessions
-
-**4. Cleanup Job (`src/persistence/cleanup.ts`)**
-
-- Run every hour
-- Remove sessions inactive > 7 days
-- Also check if opencode session still exists
-
----
-
-## Implementation Steps
-
-### Phase 1: Core Persistence
-
-1. Create `src/persistence/store.ts` with load/save functions
-2. Add `PERSISTENCE_FILE` constant to config
-3. Modify `createOpencodeServer()` to accept optional `sessionId` parameter
-4. Update `getOrCreateSession()` to check persistence layer
-
-### Phase 2: Session Recovery
-
-1. Create `src/persistence/recovery.ts` with recovery logic
-2. Call recovery on bot startup (in `src/gateway/bot.ts`)
-3. Add health check to verify opencode session exists
-
-### Phase 3: Cleanup & Polish
-
-1. Create `src/persistence/cleanup.ts` with scheduled cleanup
-2. Update lastActivity timestamp on every message
-3. Fix help text to accurately describe persistence behavior
-4. Add `/session cleanup` command for manual cleanup
-
-### Phase 4: Testing
-
-1. Unit tests for store.ts (mock filesystem)
-2. Integration tests for recovery
-3. Test cleanup job
-4. Verify behavior across bot restarts
-
----
-
-## API Changes
-
-### `createOpencodeServer()`
-
-```ts
-async function createOpencodeServer(options?: {
+```typescript
+// Already supports port: 0 for ephemeral ports
+async function createOpencodeServer(options?: { 
   port?: number
-  timeout?: number
-  sessionId?: string // NEW: attach to existing session
-})
+  timeout?: number 
+}) { ... }
 ```
 
-### `getOrCreateSession()`
-
-Behavior change: checks persistence before creating new session.
-
 ---
 
-## Open Questions
+## Benefits
 
-1. Should we persist the server port/URL or always use port 0 (ephemeral)?
-2. How to handle Discord channel/thread deletion? (cleanup on failed send?)
-3. Should sessions auto-expire even if active? (configurable TTL?)
-4. Do we need to encrypt the persistence file? (contains session IDs)
-
----
-
-## Risks
-
-- **File corruption**: Use atomic writes, keep backup
-- **Orphaned sessions**: Cleanup job should handle
-- **Concurrent access**: Single process only, but file locking for safety
-- **Large sessions file**: Paginate or use SQLite if >1000 sessions
+1. **Simple**: No persistence files, no cleanup jobs, no recovery logic
+2. **Reliable**: Single source of truth (opencode SQLite database)
+3. **Flexible**: Users can attach any session to any channel/DM
+4. **Privacy**: No session metadata stored in Discord bot
 
 ---
 
 ## Future Enhancements
 
-- SQLite backend for scale
-- Session migration between channels
-- Import/export session mappings
-- Cross-device session sync
+- Add search/filter to `/session list` (by title, date range)
+- Add pagination for users with many sessions
+- Add `/session archive` to hide old sessions from list
+- Show session directory/project in list output

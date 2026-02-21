@@ -5,6 +5,7 @@ import {
   deleteSession,
   getSessionByKey,
   updateSessionAgent,
+  createOpencodeServer,
 } from "../utils/session.js"
 import { createSuccessEmbed, createErrorEmbed, createInfoEmbed } from "../utils/discord.js"
 import { getSessionKey, getDMSessionKey } from "../utils/discord.js"
@@ -19,7 +20,7 @@ export const sessionCommand = new SlashCommandBuilder()
       .setDescription("Create a new session")
       .addStringOption((option) => option.setName("title").setDescription("Session title").setRequired(false)),
   )
-  .addSubcommand((subcommand) => subcommand.setName("list").setDescription("List your active sessions"))
+  .addSubcommand((subcommand) => subcommand.setName("list").setDescription("List all your sessions from the database"))
   .addSubcommand((subcommand) =>
     subcommand
       .setName("attach")
@@ -101,20 +102,46 @@ export async function handleSessionCommand(interaction: ChatInputCommandInteract
       }
 
       case "list": {
-        const sessions = listSessions(userId)
-        if (sessions.length === 0) {
-          await interaction.editReply({
-            embeds: [createInfoEmbed("No Sessions", "You have no active sessions")],
+        // Query all sessions from opencode database
+        let tempServer: { client: any; server: { close: () => void } } | null = null
+        
+        try {
+          tempServer = await createOpencodeServer({ port: 0, timeout: 10000 })
+          const result = await tempServer.client.session.list({
+            roots: true,
+            limit: 50,
           })
-          return
-        }
 
-        const sessionList = sessions
-          .map((s) => `• ${s.sessionId} (Last active: ${s.lastActivity.toLocaleString()})`)
-          .join("\n")
-        await interaction.editReply({
-          embeds: [createInfoEmbed("Your Sessions", sessionList)],
-        })
+          if (result.error || !result.data || result.data.length === 0) {
+            await interaction.editReply({
+              embeds: [createInfoEmbed("No Sessions", "No sessions found. Create one with `/session create`")],
+            })
+            return
+          }
+
+          const sessions = result.data
+          const sessionList = sessions
+            .map((s: any) => {
+              const timestamp = Math.floor(s.time.updated / 1000)
+              const title = s.title.length > 40 ? s.title.substring(0, 40) + "..." : s.title
+              return `• \`${s.id}\`\n  ${title}\n  Updated: <t:${timestamp}:R>`
+            })
+            .join("\n\n")
+          
+          const embed = createInfoEmbed(
+            `All Sessions (${sessions.length})`,
+            sessionList.substring(0, 4000) + "\n\nUse `/session attach <id>` to continue a session."
+          )
+          
+          await interaction.editReply({ embeds: [embed] })
+        } catch (error) {
+          console.error("Failed to list sessions:", error)
+          await interaction.editReply({
+            embeds: [createErrorEmbed("Failed to list sessions. Is opencode installed and in PATH?")],
+          })
+        } finally {
+          tempServer?.server.close()
+        }
         break
       }
 

@@ -8,7 +8,7 @@ const sessions = new Map<string, SessionData>()
 
 const OPENCODE_BINARY = "opencode"
 
-async function createOpencodeServer(options?: { port?: number; timeout?: number }) {
+export async function createOpencodeServer(options?: { port?: number; timeout?: number }) {
   const port = options?.port ?? 0
   const timeout = options?.timeout ?? 5000
 
