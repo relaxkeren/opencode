@@ -37,6 +37,6 @@ $linkPath = "$INSTALL_DIR\opencode.exe"
 if (Test-Path "$linkPath") {
     Remove-Item "$linkPath" -Force
 }
-New-Item -ItemType SymbolicLink -Path "$linkPath" -Target "$targetPath" -Force | Out-Null
+Copy-Item -Path "$targetPath" -Destination "$linkPath" -Force
 
 Write-Host "Done. Verify with: opencode --version"
