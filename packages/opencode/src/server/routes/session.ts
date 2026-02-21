@@ -819,15 +819,16 @@ export const SessionRoutes = lazy(() =>
           if (cfg.model) {
             const [providerID, modelID] = cfg.model.split("/")
             body = { ...body, model: { providerID, modelID } }
-            console.log("[session.prompt] Using default model:", cfg.model)
           }
         }
 
-        console.log("[session.prompt] Received request for session:", sessionID)
-        console.log("[session.prompt] Request body:", JSON.stringify(body))
         const msg = await SessionPrompt.prompt({ ...body, sessionID })
-        console.log("[session.prompt] Returning message:", JSON.stringify(msg).slice(0, 500))
-        return c.json(msg)
+        // Filter out internal-only parts (reasoning, step-start) before returning
+        const filteredMsg = {
+          ...msg,
+          parts: msg.parts.filter((p: any) => p.type !== "reasoning" && p.type !== "step-start")
+        }
+        return c.json(filteredMsg)
       },
     )
     .post(
