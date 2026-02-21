@@ -1,7 +1,7 @@
 #!/usr/bin/env pwsh
 # Stop the opencode-discord bot
 
-$ScriptDir = Split-Path $PSScriptRoot -Parent
+$ScriptDir = $PSScriptRoot
 $PidFile = Join-Path $ScriptDir "opencode-discord.pid"
 
 if (-not (Test-Path $PidFile)) {
@@ -9,18 +9,18 @@ if (-not (Test-Path $PidFile)) {
     exit 1
 }
 
-$Pid = Get-Content $PidFile -ErrorAction SilentlyContinue
+$BotPid = Get-Content $PidFile -ErrorAction SilentlyContinue
 
-if (-not $Pid) {
+if (-not $BotPid) {
     Write-Error "PID file is empty"
     Remove-Item $PidFile -Force
     exit 1
 }
 
 try {
-    $Process = Get-Process -Id $Pid -ErrorAction Stop
-    Write-Host "Stopping bot with PID $Pid..."
-    Stop-Process -Id $Pid -Force
+    $Process = Get-Process -Id $BotPid -ErrorAction Stop
+    Write-Host "Stopping bot with PID $BotPid..."
+    Stop-Process -Id $BotPid -Force
     Write-Host "Bot stopped"
 } catch {
     Write-Host "Process not found (may have already exited)"
