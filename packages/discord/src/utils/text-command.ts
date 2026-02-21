@@ -1049,11 +1049,33 @@ async function handleRestartTextCommand(message: Message): Promise<boolean> {
 
 async function handleLogTextCommand(message: Message, args: string[]): Promise<boolean> {
   const lines = args[0] ? parseInt(args[0], 10) : 50
-  const logPath = path.join(os.homedir(), ".local", "share", "opencode", "log", "discord-out.log")
 
-  if (!fs.existsSync(logPath)) {
+  const possiblePaths = [
+    // Actual user profile (where OpenCode daemon writes logs)
+    path.join("C:\\Users\\Ke", ".local", "share", "opencode", "log", "discord-out.log"),
+    // Windows Service user profile path (LocalSystem)
+    path.join(process.env.USERPROFILE || os.homedir(), ".local", "share", "opencode", "log", "discord-out.log"),
+    // Manual run path
+    path.join(os.homedir(), ".local", "share", "opencode", "log", "discord-out.log"),
+    // Legacy path relative to cwd
+    path.join(process.cwd(), "logs", "service-out.log"),
+  ]
+
+  let logPath: string | null = null
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      logPath = p
+      break
+    }
+  }
+
+  if (!logPath) {
     await message.reply({
-      embeds: [createErrorEmbed("Log file not found. Make sure the bot is running as a Windows Service.")],
+      embeds: [
+        createErrorEmbed(
+          "Log file not found. The bot is not running as a Windows Service, or logs are in an unexpected location.",
+        ),
+      ],
     })
     return true
   }

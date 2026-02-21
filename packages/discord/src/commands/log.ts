@@ -18,19 +18,48 @@ export const logCommand = new SlashCommandBuilder()
 
 export async function handleLogCommand(interaction: ChatInputCommandInteraction<CacheType>) {
   const lines = interaction.options.getInteger("lines") || 50
+  console.log("[log] Handling log command, lines:", lines)
 
   await interaction.deferReply()
 
   try {
-    const logPath = path.join(os.homedir(), ".local", "share", "opencode", "log", "discord-out.log")
+    const possiblePaths = [
+      // Actual user profile (where OpenCode daemon writes logs)
+      path.join("C:\\Users\\Ke", ".local", "share", "opencode", "log", "discord-out.log"),
+      // Windows Service user profile path (LocalSystem)
+      path.join(process.env.USERPROFILE || os.homedir(), ".local", "share", "opencode", "log", "discord-out.log"),
+      // Manual run path
+      path.join(os.homedir(), ".local", "share", "opencode", "log", "discord-out.log"),
+      // Legacy path relative to cwd
+      path.join(process.cwd(), "logs", "service-out.log"),
+    ]
+    console.log("[log] USERPROFILE:", process.env.USERPROFILE)
+    console.log("[log] homedir:", os.homedir())
+    console.log("[log] cwd:", process.cwd())
+    console.log("[log] checking paths:", possiblePaths)
 
-    if (!fs.existsSync(logPath)) {
+    let logPath: string | null = null
+    for (const p of possiblePaths) {
+      console.log("[log] checking:", p, "exists:", fs.existsSync(p))
+      if (fs.existsSync(p)) {
+        logPath = p
+        break
+      }
+    }
+
+    if (!logPath) {
+      console.log("[log] No log file found")
       await interaction.editReply({
-        embeds: [createErrorEmbed("Log file not found. Make sure the bot is running as a Windows Service.")],
+        embeds: [
+          createErrorEmbed(
+            "Log file not found. The bot is not running as a Windows Service, or logs are in an unexpected location.",
+          ),
+        ],
       })
       return
     }
 
+    console.log("[log] Found log at:", logPath)
     const content = fs.readFileSync(logPath, "utf-8")
     const logLines = content.split("\n")
     const lastLines = logLines.slice(-lines).join("\n")
