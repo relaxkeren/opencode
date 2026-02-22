@@ -36,7 +36,7 @@ if (-not (Test-Path $NssmExe)) {
     }
 }
 
-# Stop service
+# Stop service if running
 if ($service.Status -eq "Running") {
     Write-Host "Stopping service..." -NoNewline
     Stop-Service -Name $ServiceName -Force
@@ -46,19 +46,29 @@ if ($service.Status -eq "Running") {
 
 # Remove service
 Write-Host "Removing service..." -NoNewline
-if (Test-Path $NssmExe) {
-    & $NssmExe remove $ServiceName confirm 2>&1 | Out-Null
-} else {
-    # Fallback to sc.exe
-    sc.exe delete $ServiceName | Out-Null
-}
-Write-Host " OK" -ForegroundColor Green
 
-# Verify removal
+if (Test-Path $NssmExe) {
+    # Use NSSM to remove (redirect stderr to avoid error display)
+    & $NssmExe remove $ServiceName confirm 2>&1 | Out-Null
+}
+
+# Verify removal and fallback to sc.exe if needed
+Start-Sleep -Seconds 2
 $verifyService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+
 if ($verifyService) {
-    Write-Error "Failed to remove service. It may still exist."
+    # Try sc.exe as fallback
+    sc.exe delete $ServiceName 2>&1 | Out-Null
+    Start-Sleep -Seconds 2
+    $verifyService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+}
+
+if ($verifyService) {
+    Write-Host " FAILED" -ForegroundColor Red
+    Write-Error "Failed to remove service. Try removing manually via services.msc"
     exit 1
+} else {
+    Write-Host " OK" -ForegroundColor Green
 }
 
 Write-Host ""
@@ -69,11 +79,13 @@ Write-Host ""
 
 if (-not $KeepLogs) {
     $LogDir = "$env:USERPROFILE\.local\share\opencode\log"
-    $response = Read-Host "Delete log files at $LogDir? (y/N)"
-    if ($response -eq "y" -or $response -eq "Y") {
-        Write-Host "Deleting log files..." -NoNewline
-        Remove-Item -Path "$LogDir\discord-*.log" -ErrorAction SilentlyContinue
-        Write-Host " OK" -ForegroundColor Green
+    if (Test-Path "$LogDir\discord-*.log") {
+        $response = Read-Host "Delete log files at $LogDir? (y/N)"
+        if ($response -eq "y" -or $response -eq "Y") {
+            Write-Host "Deleting log files..." -NoNewline
+            Remove-Item -Path "$LogDir\discord-*.log" -ErrorAction SilentlyContinue
+            Write-Host " OK" -ForegroundColor Green
+        }
     }
 }
 
