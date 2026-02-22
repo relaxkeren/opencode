@@ -1,16 +1,4 @@
 import type { Interaction, CacheType } from "discord.js"
-import { handleAskCommand } from "../commands/ask.js"
-import { handleSessionCommand } from "../commands/session.js"
-import { handleAgentCommand } from "../commands/agent.js"
-import { handleModelCommand } from "../commands/model.js"
-import { handleMcpCommand } from "../commands/mcp.js"
-import { handleConnectCommand } from "../commands/connect.js"
-import { handleStatusCommand } from "../commands/status.js"
-import { handleHelpCommand } from "../commands/help.js"
-import { handleStopCommand } from "../commands/stop.js"
-import { handleRestartCommand } from "../commands/restart.js"
-import { handleLogCommand } from "../commands/log.js"
-import { handleRunCommand } from "../commands/run.js"
 import { getAllCommands } from "../commands/registry.js"
 import { ConfigManager } from "../config/manager.js"
 import { PairingStore } from "../security/pairing.js"
@@ -51,46 +39,15 @@ export async function handleInteraction(
   const { commandName } = interaction
 
   try {
-    switch (commandName) {
-      case "ask":
-        await handleAskCommand(interaction)
-        break
-      case "session":
-        await handleSessionCommand(interaction)
-        break
-      case "agent":
-        await handleAgentCommand(interaction)
-        break
-      case "model":
-        await handleModelCommand(interaction)
-        break
-      case "mcp":
-        await handleMcpCommand(interaction)
-        break
-      case "connect":
-        await handleConnectCommand(interaction)
-        break
-      case "status":
-        await handleStatusCommand(interaction)
-        break
-      case "help":
-        await handleHelpCommand(interaction)
-        break
-      case "stop":
-        await handleStopCommand(interaction)
-        break
-      case "restart":
-        await handleRestartCommand(interaction)
-        break
-      case "log":
-        await handleLogCommand(interaction)
-        break
-      case "run":
-        await handleRunCommand(interaction)
-        break
-      default:
-        console.log(`Unknown command: ${commandName}`)
+    const commands = getAllCommands()
+    const command = commands.find((cmd) => cmd.key === commandName)
+
+    if (!command) {
+      console.log(`Unknown command: ${commandName}`)
+      return
     }
+
+    await command.handle(interaction)
   } catch (error) {
     console.error(`Error handling command ${commandName}:`, error)
 
