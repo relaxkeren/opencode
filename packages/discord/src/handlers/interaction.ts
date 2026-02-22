@@ -10,6 +10,7 @@ import { handleHelpCommand } from "../commands/help.js"
 import { handleStopCommand } from "../commands/stop.js"
 import { handleRestartCommand } from "../commands/restart.js"
 import { handleLogCommand } from "../commands/log.js"
+import { handleRunCommand } from "../commands/run.js"
 import { getAllCommands } from "../commands/registry.js"
 import { ConfigManager } from "../config/manager.js"
 import { PairingStore } from "../security/pairing.js"
@@ -83,6 +84,9 @@ export async function handleInteraction(
         break
       case "log":
         await handleLogCommand(interaction)
+        break
+      case "run":
+        await handleRunCommand(interaction)
         break
       default:
         console.log(`Unknown command: ${commandName}`)
