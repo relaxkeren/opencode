@@ -75,7 +75,11 @@ if ($existingService) {
         Write-Host "Service '$ServiceName' already exists. Reinstalling..." -ForegroundColor Yellow
         Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 2
+        # Try NSSM first, fall back to sc.exe
         & $NssmExe remove $ServiceName confirm 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            sc.exe delete $ServiceName 2>&1 | Out-Null
+        }
         Start-Sleep -Seconds 2
     } else {
         Write-Error "Service '$ServiceName' already exists. Use -Force to reinstall."
@@ -117,16 +121,25 @@ Write-Host "Configuring service..." -NoNewline
 & $NssmExe set $ServiceName AppDirectory $env:USERPROFILE 2>&1 | Out-Null
 & $NssmExe set $ServiceName Start $StartMode 2>&1 | Out-Null
 
-# Note: NO log redirection - binary handles logging internally
-# NSSM stdout/stderr not set = no redirection
+# NSSM log files (separate from bot's discord-out.log)
+$NssmOutLog = "$LogDir\nssm-out.log"
+$NssmErrLog = "$LogDir\nssm-err.log"
+& $NssmExe set $ServiceName AppStdout $NssmOutLog 2>&1 | Out-Null
+& $NssmExe set $ServiceName AppStderr $NssmErrLog 2>&1 | Out-Null
 
-# Set environment variables to ensure correct user home directory
-$envString = "USERPROFILE=$env:USERPROFILE;HOMEDRIVE=C:;HOMEPATH=\Users\$($env:USERNAME)"
-& $NssmExe set $ServiceName AppEnvironmentExtra $envString 2>&1 | Out-Null
+# Set environment variables for the user's home directory
+# This is needed when running as LocalSystem to find config files
+$userProfile = $env:USERPROFILE
+$userHomePath = "\Users\$($env:USERNAME)"
+& $NssmExe set $ServiceName AppEnvironmentExtra "USERPROFILE=$userProfile" 2>&1 | Out-Null
+& $NssmExe set $ServiceName AppEnvironmentExtra "HOMEDRIVE=C:" 2>&1 | Out-Null
+& $NssmExe set $ServiceName AppEnvironmentExtra "HOMEPATH=$userHomePath" 2>&1 | Out-Null
 
 # Configure restart behavior
 & $NssmExe set $ServiceName AppRestartDelay 3000 2>&1 | Out-Null
 Write-Host " OK" -ForegroundColor Green
+
+# Note: Running as LocalSystem. Environment variables above point to user's folders.
 
 # Configure service recovery (restart on failure)
 Write-Host "Configuring failure recovery..." -NoNewline
@@ -144,7 +157,9 @@ if ($service.Status -eq "Running") {
     Write-Host " OK" -ForegroundColor Green
 } else {
     Write-Host " WARNING" -ForegroundColor Yellow
-    Write-Host "Service installed but may not be running. Check logs at: $LogDir\discord-out.log" -ForegroundColor Yellow
+    Write-Host "Service installed but may not be running. Check logs:" -ForegroundColor Yellow
+    Write-Host "  Bot:  $LogDir\discord-out.log" -ForegroundColor Gray
+    Write-Host "  NSSM: $NssmOutLog" -ForegroundColor Gray
 }
 
 Write-Host ""
@@ -154,7 +169,8 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Service Name: $ServiceName" -ForegroundColor Cyan
 Write-Host "Status: $($service.Status)" -ForegroundColor Cyan
-Write-Host "Log File: $LogDir\discord-out.log" -ForegroundColor Cyan
+Write-Host "Bot Log: $LogDir\discord-out.log" -ForegroundColor Cyan
+Write-Host "NSSM Log: $NssmOutLog" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Management Commands:" -ForegroundColor Yellow
 Write-Host "  Start:   Start-Service $ServiceName" -ForegroundColor Gray

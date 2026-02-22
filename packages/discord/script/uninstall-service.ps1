@@ -47,21 +47,12 @@ if ($service.Status -eq "Running") {
 # Remove service
 Write-Host "Removing service..." -NoNewline
 
-if (Test-Path $NssmExe) {
-    # Use NSSM to remove (redirect stderr to avoid error display)
-    & $NssmExe remove $ServiceName confirm 2>&1 | Out-Null
-}
-
-# Verify removal and fallback to sc.exe if needed
+# Try sc.exe first (more reliable)
+sc.exe delete $ServiceName 2>&1 | Out-Null
 Start-Sleep -Seconds 2
-$verifyService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 
-if ($verifyService) {
-    # Try sc.exe as fallback
-    sc.exe delete $ServiceName 2>&1 | Out-Null
-    Start-Sleep -Seconds 2
-    $verifyService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-}
+# Verify removal
+$verifyService = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
 
 if ($verifyService) {
     Write-Host " FAILED" -ForegroundColor Red
