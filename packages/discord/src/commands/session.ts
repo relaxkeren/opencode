@@ -104,17 +104,17 @@ export async function handleSessionCommand(interaction: ChatInputCommandInteract
       case "list": {
         // Query all sessions from opencode database
         let tempServer: { client: any; server: { close: () => void } } | null = null
-        
+
         try {
           console.log("[session list] Creating temporary opencode server...")
           tempServer = await createOpencodeServer({ port: 0, timeout: 10000 })
           console.log("[session list] Server created, querying sessions...")
-          
+
           const result = await tempServer.client.session.list({
             roots: true,
             limit: 50,
           })
-          
+
           console.log("[session list] Result:", JSON.stringify({ error: result.error, dataLength: result.data?.length }))
 
           if (result.error) {
@@ -124,7 +124,7 @@ export async function handleSessionCommand(interaction: ChatInputCommandInteract
             })
             return
           }
-          
+
           if (!result.data || result.data.length === 0) {
             console.log("[session list] No sessions found in database")
             await interaction.editReply({
@@ -135,13 +135,41 @@ export async function handleSessionCommand(interaction: ChatInputCommandInteract
 
           const sessions = result.data.slice(0, 10) // Limit to 10 sessions for embed field limits
           console.log("Session list data:", JSON.stringify(sessions[0], null, 2))
-          
+
           const { EmbedBuilder } = await import("discord.js")
           const embed = new EmbedBuilder()
             .setColor(0x0099ff)
             .setTitle(`📋 Your Sessions (${result.data.length})`)
             .setDescription(result.data.length > 10 ? "Showing first 10 sessions. Use `/session list` with search to find more." : "All your opencode sessions")
-          
+
+          // Build text file content with full session details
+          let fileContent = `OpenCode Sessions - ${new Date().toISOString()}\n`
+          fileContent += `${"=".repeat(80)}\n\n`
+          fileContent += `Total: ${result.data.length} session(s)\n\n`
+
+          for (const s of result.data) {
+            const id = s.id || 'unknown'
+            const title = s.title || 'Untitled'
+            const directory = s.directory || 'unknown'
+            const updated = s.time?.updated || Date.now()
+            const isShared = s.share?.url ? true : false
+            const fileCount = s.summary?.files || 0
+            const dateStr = new Date(updated).toLocaleString()
+
+            fileContent += `Session ID: ${id}\n`
+            fileContent += `Title: ${title}\n`
+            fileContent += `Directory: ${directory}\n`
+            fileContent += `Updated: ${dateStr}\n`
+            fileContent += `Shared: ${isShared ? 'Yes' : 'No'}${isShared ? ` (${s.share.url})` : ''}\n`
+            fileContent += `Files changed: ${fileCount}\n`
+            fileContent += `${"-".repeat(80)}\n\n`
+          }
+
+          fileContent += `\nUse "/session attach <id>" to attach to a session\n`
+
+          // Create file attachment
+          const buffer = Buffer.from(fileContent, "utf-8")
+
           for (const s of sessions) {
             const id = s.id || 'unknown'
             const title = s.title || 'Untitled'
@@ -149,29 +177,37 @@ export async function handleSessionCommand(interaction: ChatInputCommandInteract
             const updated = s.time?.updated || Date.now()
             const isShared = s.share?.url ? true : false
             const fileCount = s.summary?.files || 0
-            
+
             const timestamp = Math.floor(updated / 1000)
-            const folderName = directory.includes('/') 
+            const folderName = directory.includes('/')
               ? directory.substring(directory.lastIndexOf('/') + 1)
               : directory.includes('\\')
                 ? directory.substring(directory.lastIndexOf('\\') + 1)
                 : directory
-            
+
             const shareIcon = isShared ? ' 🔗' : ''
             const filesText = fileCount > 0 ? `• ${fileCount} files changed` : ''
-            
+
             // Field name: short ID + share status
             const fieldName = `${id.substring(0, 16)}...${shareIcon}`
-            
+
             // Field value: title, folder, timestamp
             const fieldValue = `**${title.substring(0, 50)}**\n📁 ${folderName}\n${filesText}\n🕐 <t:${timestamp}:R>`
-            
+
             embed.addFields({ name: fieldName, value: fieldValue, inline: true })
           }
-          
+
           embed.setFooter({ text: "Use /session attach <id> to continue a session" })
-          
-          await interaction.editReply({ embeds: [embed] })
+
+          await interaction.editReply({
+            embeds: [embed],
+            files: [
+              {
+                attachment: buffer,
+                name: `sessions-${new Date().toISOString().split('T')[0]}.txt`,
+              },
+            ],
+          })
         } catch (error) {
           console.error("[session list] Failed to list sessions:", error)
           await interaction.editReply({
