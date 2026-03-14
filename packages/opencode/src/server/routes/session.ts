@@ -817,8 +817,8 @@ export const SessionRoutes = lazy(() =>
         if (!body.model) {
           const cfg = await Config.get()
           if (cfg.model) {
-            const [providerID, modelID] = cfg.model.split("/")
-            body = { ...body, model: { providerID, modelID } }
+            const [p, m] = cfg.model.split("/")
+            body = { ...body, model: { providerID: ProviderID.make(p), modelID: ModelID.make(m) } }
           }
         }
 
