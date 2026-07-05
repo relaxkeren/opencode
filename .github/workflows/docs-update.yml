@@ -1,8 +1,9 @@
 name: docs-update
 
 on:
-  schedule:
-    - cron: "0 */12 * * *"
+  # Disabled time-based trigger; run manually via workflow_dispatch.
+  # schedule:
+  #   - cron: "0 */12 * * *"
   workflow_dispatch:
 
 env:

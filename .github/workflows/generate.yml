@@ -1,9 +1,13 @@
 name: generate
 
 on:
-  push:
-    branches:
-      - dev
+  # Disabled: this workflow pushed generated code back to `dev` using a GitHub
+  # App token, which re-triggered the same workflow (recursive loop). Run
+  # manually via workflow_dispatch instead.
+  # push:
+  #   branches:
+  #     - dev
+  workflow_dispatch:
 
 jobs:
   generate:
